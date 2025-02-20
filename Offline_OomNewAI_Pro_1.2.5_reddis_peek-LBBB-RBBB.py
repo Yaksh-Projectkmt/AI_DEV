@@ -275,7 +275,7 @@ os.makedirs(folder_path)
 
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_35_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_41_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -293,8 +293,8 @@ with tf.device('/CPU:0'):
     # tf_cwt_model = load_tflite_model("JR_model_20_09_0_two_different_inputs.tflite")
     afib_load_model = load_tflite_model("afib_flutter_17_1.tflite")
     vfib_vfl_model = load_tflite_model("VFIB_Model_07JUN2024_1038.tflite")
-    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_22.tflite")
-    block_load_model = load_tflite_model("Block_tran_2.tflite")
+    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_24.tflite")
+    block_load_model = load_tflite_model("Block_convex_2.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
 
 ref_files = "200_standard.csv"
