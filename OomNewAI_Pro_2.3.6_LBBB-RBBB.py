@@ -948,7 +948,7 @@ def check_noise_model(ecg_signal, frequency):
     total_data = ecg_signal.shape[0]
     start = 0
     baseline, non_ecg = [], []
-    percent = {'Normal': 0, 'Noise': 0}
+    percentage = {'Normal': 0, 'Noise': 0, 'total_slice': 0}
     while start < total_data:
         end = start + steps_data
         if end - start == steps_data and end < total_data:
@@ -959,24 +959,31 @@ def check_noise_model(ecg_signal, frequency):
         output_data, class_name = prediction_model_noise(image_data)
         if class_name == 'Normal':
             baseline.append(((start, end), output_data))
-            percent['Normal'] += (end - start) / total_data
+            # percent['Normal'] += (end - start) / total_data
+            percentage['Normal'] += 1
         else:
             non_ecg.append(((start, end), output_data))
-            percent['Noise'] += (end - start) / total_data
+            # percent['Noise'] += (end - start) / total_data
+            percentage['Noise'] += 1
         start += steps_data
-    return baseline, non_ecg, percent
+    noise_label = 'Normal'
+    if percentage['total_slice'] != 0:
+        if percentage['Noise'] == percentage['total_slice'] and percentage['total_slice'] > 0.5:
+            noise_label = 'high_noise'
+        elif percentage['Noise']/percentage['total_slice']  >= 0.6:
+            noise_label = 'high_noise'
+    return noise_label
 
 def noise_engine(flag,ecgdata):
     global ref_file
+    noise_label = 'Normal'
     if flag == "200":
         ecg_signal = np.array(ecgdata["ECG"])
-        baseline, non_ecg, percent = check_noise_model(ecg_signal, 200)
-        
-        if percent["Normal"]>0.5:
-            return "Normal"
-        else:
-            return "high_noise"
+        noise_label = check_noise_model(ecg_signal, 200)
 
+    return noise_label
+    
+    
 def unique(list1):
  
     # initialize a null list
@@ -4294,7 +4301,7 @@ class block_detection:
                 ei_ti_label.append('2nd degree')
             if 0.40 < float(predictions[0]) < 0.70:
                 ei_ti_label.append('1st degree')
-            if 0.40 < float(predictions[3]) < 0.70:
+            if 0.40 < float(predictions[2]) < 0.70:
                 ei_ti_label.append('3rd degree')
         return label, ei_ti_label, predictions
 
