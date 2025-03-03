@@ -196,7 +196,7 @@ output_details_noise = interpreter_noise.get_output_details()
 with tf.device('/CPU:0'):
     # tf_cwt_model = load_tflite_model("JR_model_20_09_0_two_different_inputs.tflite")
     afib_load_model = load_tflite_model("afib_flutter_17_1.tflite")
-    vfib_vfl_model = load_tflite_model("VFIB_Model_07JUN2024_1038.tflite")
+    vfib_vfl_model = load_tflite_model("vfib_trans_mob_1.tflite")
     pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_24.tflite")
     block_load_model = load_tflite_model("Block_convex_2.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
@@ -256,47 +256,47 @@ def find_r_peak_mi(ecg_signal, fs):
     r_peaks = rpeaks[0].tolist()
     return r_peaks
 
-def mi_detection(baseline_signal,ecg_signal, r_peaks, fs):
-    try:
-        _, waves_peak = nk.ecg_delineate(baseline_signal, r_peaks, sampling_rate=fs, method="peak")
+# def mi_detection(baseline_signal,ecg_signal, r_peaks, fs):
+#     try:
+#         _, waves_peak = nk.ecg_delineate(baseline_signal, r_peaks, sampling_rate=fs, method="peak")
 
-        Speaks = np.where(np.isnan(waves_peak['ECG_S_Peaks']), 0, waves_peak['ECG_S_Peaks']).astype('int64').tolist()
-        Tpeaks = np.where(np.isnan(waves_peak['ECG_T_Peaks']), 0, waves_peak['ECG_T_Peaks']).astype('int64').tolist()
+#         Speaks = np.where(np.isnan(waves_peak['ECG_S_Peaks']), 0, waves_peak['ECG_S_Peaks']).astype('int64').tolist()
+#         Tpeaks = np.where(np.isnan(waves_peak['ECG_T_Peaks']), 0, waves_peak['ECG_T_Peaks']).astype('int64').tolist()
         
-    except:
-        label ="Abnormal"
-##        print("<<<<<<<<<<<<<<<<<<<<<<<<< something wrong >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        return label
+#     except:
+#         label ="Abnormal"
+# ##        print("<<<<<<<<<<<<<<<<<<<<<<<<< something wrong >>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+#         return label
 
-    mi_counter = 0  # Counter for MI detections
-    for r_peak, t_peak in zip(r_peaks, Tpeaks):
-        mid_value = (baseline_signal[r_peak] + baseline_signal[Speaks[Tpeaks.index(t_peak)]]) / 2  # Calculate mid value
+#     mi_counter = 0  # Counter for MI detections
+#     for r_peak, t_peak in zip(r_peaks, Tpeaks):
+#         mid_value = (baseline_signal[r_peak] + baseline_signal[Speaks[Tpeaks.index(t_peak)]]) / 2  # Calculate mid value
         
-        if baseline_signal[t_peak] > mid_value: # Compare T peak to mid value
-            mi_counter += 1
+#         if baseline_signal[t_peak] > mid_value: # Compare T peak to mid value
+#             mi_counter += 1
     
-    mi_percentage = (mi_counter / len(r_peaks)) * 100
+#     mi_percentage = (mi_counter / len(r_peaks)) * 100
     
-    anterior = []
-    posterior = []
-    if mi_percentage >= 52:
-        for i in range(len(r_peaks)-1):
-            area = trapz(baseline_signal[r_peaks[i]:Tpeaks[i]+1])
-            if round(area, 2) < 12:
-                anterior.append(round(area,2))
-            elif  12 <= round(area, 2) <= 30:
-                posterior.append(round(area, 2))
+#     anterior = []
+#     posterior = []
+#     if mi_percentage >= 52:
+#         for i in range(len(r_peaks)-1):
+#             area = trapz(baseline_signal[r_peaks[i]:Tpeaks[i]+1])
+#             if round(area, 2) < 12:
+#                 anterior.append(round(area,2))
+#             elif  12 <= round(area, 2) <= 30:
+#                 posterior.append(round(area, 2))
 
     
-    anterior_per = (len(anterior)/len(r_peaks))*100
-    posterior_per = (len(posterior)/len(r_peaks))*100
-    if posterior_per >= 70:
-        label = "Posterior STEMI"
-    elif anterior_per >= 70:
-        label = "Anterior STEMI"
-    else:
-        label = "Abnormal"
-    return label
+#     anterior_per = (len(anterior)/len(r_peaks))*100
+#     posterior_per = (len(posterior)/len(r_peaks))*100
+#     if posterior_per >= 70:
+#         label = "Posterior STEMI"
+#     elif anterior_per >= 70:
+#         label = "Anterior STEMI"
+#     else:
+#         label = "Abnormal"
+#     return label
 
 
 def prediction_model(image_path, target_shape=[224, 224], class_name=True):
@@ -322,108 +322,180 @@ def prediction_model(image_path, target_shape=[224, 224], class_name=True):
         return output_data[0]
 
 
-def resampled_ecg_data(ecg_signal, original_freq, desire_freq):
-    original_time = np.arange(len(ecg_signal)) / original_freq
-    new_time = np.linspace(original_time[0], original_time[-1], int(len(ecg_signal) * (desire_freq/original_freq)))
-    interp_func = interp1d(original_time, ecg_signal, kind='linear')
-    scaled_ecg_data = interp_func(new_time)
-    return scaled_ecg_data
+# def resampled_ecg_data(ecg_signal, original_freq, desire_freq):
+#     original_time = np.arange(len(ecg_signal)) / original_freq
+#     new_time = np.linspace(original_time[0], original_time[-1], int(len(ecg_signal) * (desire_freq/original_freq)))
+#     interp_func = interp1d(original_time, ecg_signal, kind='linear')
+#     scaled_ecg_data = interp_func(new_time)
+#     return scaled_ecg_data
 
-def image_array_news_vfib(signal):
-    scales = np.arange(1, 50, 1)
-    coef, freqs = pywt.cwt(signal, scales, 'mexh')
-    abs_coef = np.abs(coef)
-    y_scale = abs_coef.shape[0] / 224
-    x_scale = abs_coef.shape[1] / 224
-    x_indices = np.arange(224) * x_scale
-    y_indices = np.arange(224) * y_scale
-    x, y = np.meshgrid(x_indices, y_indices, indexing='ij')
-    x = x.astype(int)
-    y = y.astype(int)
-    rescaled_coef = abs_coef[y, x]
-    min_val = np.min(rescaled_coef)
-    max_val = np.max(rescaled_coef)
-    normalized_coef = (rescaled_coef - min_val) / (max_val - min_val)
-    cmap_indices = (normalized_coef * 256).astype(np.uint8)
-    cmap = colormaps.get_cmap('viridis')
-    rgb_values = cmap(cmap_indices)
-    image = rgb_values.reshape((224, 224, 4))[:, :, :3]
-    denormalized_image = (image * 254) + 1
-    rotated_image = np.rot90(denormalized_image, k=1, axes=(1, 0))
-    return rotated_image.astype(np.uint8)
+# def image_array_news_vfib(signal):
+#     scales = np.arange(1, 50, 1)
+#     coef, freqs = pywt.cwt(signal, scales, 'mexh')
+#     abs_coef = np.abs(coef)
+#     y_scale = abs_coef.shape[0] / 224
+#     x_scale = abs_coef.shape[1] / 224
+#     x_indices = np.arange(224) * x_scale
+#     y_indices = np.arange(224) * y_scale
+#     x, y = np.meshgrid(x_indices, y_indices, indexing='ij')
+#     x = x.astype(int)
+#     y = y.astype(int)
+#     rescaled_coef = abs_coef[y, x]
+#     min_val = np.min(rescaled_coef)
+#     max_val = np.max(rescaled_coef)
+#     normalized_coef = (rescaled_coef - min_val) / (max_val - min_val)
+#     cmap_indices = (normalized_coef * 256).astype(np.uint8)
+#     cmap = colormaps.get_cmap('viridis')
+#     rgb_values = cmap(cmap_indices)
+#     image = rgb_values.reshape((224, 224, 4))[:, :, :3]
+#     denormalized_image = (image * 254) + 1
+#     rotated_image = np.rot90(denormalized_image, k=1, axes=(1, 0))
+#     return rotated_image.astype(np.uint8)
 
-def vfib_model_pred_tfite(raw_signal, model, fs):
-##    if fs == 200 and (np.max(raw_signal) > 4.1 or np.min(raw_signal) < 0):
-    raw_signal = MinMaxScaler(feature_range=(0,4)).fit_transform(raw_signal.reshape(-1,1)).squeeze()
-    seconds = 2.5
-    steps_data = int(fs*seconds)
-    total_data = raw_signal.shape[0]
-    start = 0
-    normal, vfib_vflutter, asys, noise = [], [], [], []
-    percentage = {'NORMAL':0, 'VFIB-VFLUTTER':0, 'ASYS':0, 'NOISE':0}
-    model_prediction = []
-    while start < total_data:
-        end = start+steps_data
-        if end - start == steps_data and end < total_data:
-            _raw_s_ = raw_signal[start:end]
-            if _raw_s_.any() :
-                raw = image_array_news_vfib(_raw_s_)
-            else:
-                raw = np.array([])
-        else:
-            _raw_s_ = raw_signal[start:end]
-            if _raw_s_.any():
-                _raw_s_ = raw_signal[-steps_data:total_data]
-                raw = image_array_news_vfib(_raw_s_)
-                end = total_data - 1
-            else:
-                raw = np.array([])
-        if raw.any():
-            raw = raw.astype(np.float32)/255
-            rs_raw = resampled_ecg_data(_raw_s_, fs, 500/seconds)
-            if rs_raw.shape[0] != 500:
-                rs_raw = signal.resample(rs_raw, 500)
-##            image_data = (tf.expand_dims(raw, axis=0), tf.constant(rs_raw.reshape(1, -1, 1).astype(np.float32)))
-##            # image_data = (tf.cast(image_data[0],dtype=tf.float32), )
-            image_data = (tf.expand_dims(raw, axis=0),)
-            model_pred = predict_tflite_model(model, image_data)[0]
-            label = np.argmax(model_pred)
-            model_prediction.append(f'{(start, end)}={model_pred}')
-            if label == 0: normal.append(((start, end), model_pred)); percentage['NORMAL'] += (end-start)/total_data
-            elif label == 1: vfib_vflutter.append(((start, end), model_pred)); percentage['VFIB-VFLUTTER'] += (end-start)/total_data
-            elif label == 2: asys.append(((start, end), model_pred)); percentage['ASYS'] += (end-start)/total_data
-            else: noise.append(((start, end), model_pred)); percentage['NOISE'] += (end-start)/total_data
-        start = start+steps_data
-    
-    return normal, vfib_vflutter, asys, noise, model_prediction, percentage
+# def vfib_model_pred_tfite(raw_signal, model, fs):
+#     raw_signal = MinMaxScaler(feature_range=(0,4)).fit_transform(raw_signal.reshape(-1,1)).squeeze()
+#     seconds = 2.5
+#     steps_data = int(fs*seconds)
+#     total_data = raw_signal.shape[0]
+#     start = 0
+#     normal, vfib_vflutter, asys, noise = [], [], [], []
+#     percentage = {'NORMAL':0, 'VFIB-VFLUTTER':0, 'ASYS':0, 'NOISE':0}
+#     model_prediction = []
+#     while start < total_data:
+#         end = start+steps_data
+#         if end - start == steps_data and end < total_data:
+#             _raw_s_ = raw_signal[start:end]
+#             if _raw_s_.any() :
+#                 raw = image_array_news_vfib(_raw_s_)
+#             else:
+#                 raw = np.array([])
+#         else:
+#             _raw_s_ = raw_signal[start:end]
+#             if _raw_s_.any():
+#                 _raw_s_ = raw_signal[-steps_data:total_data]
+#                 raw = image_array_news_vfib(_raw_s_)
+#                 end = total_data - 1
+#             else:
+#                 raw = np.array([])
+#         if raw.any():
+#             raw = raw.astype(np.float32)/255
+#             rs_raw = resampled_ecg_data(_raw_s_, fs, 500/seconds)
+#             if rs_raw.shape[0] != 500:
+#                 rs_raw = signal.resample(rs_raw, 500)
+#             image_data = (tf.expand_dims(raw, axis=0),)
+#             model_pred = predict_tflite_model(model, image_data)[0]
+#             label = np.argmax(model_pred)
+#             model_prediction.append(f'{(start, end)}={model_pred}')
+#             if label == 0: normal.append(((start, end), model_pred)); percentage['NORMAL'] += (end-start)/total_data
+#             elif label == 1: vfib_vflutter.append(((start, end), model_pred)); percentage['VFIB-VFLUTTER'] += (end-start)/total_data
+#             elif label == 2: asys.append(((start, end), model_pred)); percentage['ASYS'] += (end-start)/total_data
+#             else: noise.append(((start, end), model_pred)); percentage['NOISE'] += (end-start)/total_data
+#         start = start+steps_data
+#     return normal, vfib_vflutter, asys, noise, model_prediction, percentage
 
-def vfib_model_check_new(ecg_signal, model, fs):
-    normal, vfib_vflutter, asys, noise, model_prediction, percentage = vfib_model_pred_tfite(ecg_signal, model, fs)
+# def vfib_model_check_new(ecg_signal, model, fs):
+#     normal, vfib_vflutter, asys, noise, model_prediction, percentage = vfib_model_pred_tfite(ecg_signal, model, fs)
     
-    final_label_index = np.argmax([percentage['NORMAL'], percentage['VFIB-VFLUTTER'],
-                             percentage['ASYS'], percentage['NOISE']])
+#     final_label_index = np.argmax([percentage['NORMAL'], percentage['VFIB-VFLUTTER'],
+#                              percentage['ASYS'], percentage['NOISE']])
     
-    if final_label_index == 0 and percentage['NORMAL'] > .50:
-        final_label = 'Normal'
-        percentage = percentage['NORMAL']
-    elif final_label_index == 0 and (percentage['VFIB-VFLUTTER'] < 0.3 and percentage['ASYS'] < 0.3 and percentage['NOISE'] < 0.3):
-        final_label = 'Normal'
-        percentage = percentage['NORMAL']
-    else:
-        final_label_index = np.argmax([percentage['VFIB-VFLUTTER'],
-                                percentage['ASYS'], percentage['NOISE']])
-        if final_label_index == 0:
-            final_label = 'VFIB/Vflutter'
-            percentage = percentage['VFIB-VFLUTTER']
-        elif final_label_index == 1:
-            final_label = 'ASYS'
-            percentage = percentage['ASYS']
-        else:
-            final_label = 'Noise'
-            percentage = percentage['NOISE']
+#     if final_label_index == 0 and percentage['NORMAL'] > .50:
+#         final_label = 'Normal'
+#         percentage = percentage['NORMAL']
+#     elif final_label_index == 0 and (percentage['VFIB-VFLUTTER'] < 0.3 and percentage['ASYS'] < 0.3 and percentage['NOISE'] < 0.3):
+#         final_label = 'Normal'
+#         percentage = percentage['NORMAL']
+#     else:
+#         final_label_index = np.argmax([percentage['VFIB-VFLUTTER'],
+#                                 percentage['ASYS'], percentage['NOISE']])
+#         if final_label_index == 0:
+#             final_label = 'VFIB/Vflutter'
+#             percentage = percentage['VFIB-VFLUTTER']
+#         elif final_label_index == 1:
+#             final_label = 'ASYS'
+#             percentage = percentage['ASYS']
+#         else:
+#             final_label = 'Noise'
+#             percentage = percentage['NOISE']
         
-    return final_label, percentage, (normal, vfib_vflutter, asys, noise, model_prediction)
+#     return final_label, percentage, (normal, vfib_vflutter, asys, noise, model_prediction)
 
+def prediction_model_vfib_vfl(input_arr, vfib_vfl_model):
+    classes = ['VFIB', 'asystole', 'noise', 'normal']
+    input_arr = tf.io.decode_jpeg(tf.io.read_file(input_arr), channels=3)
+    input_arr = tf.image.resize(input_arr, size=(224, 224), method=tf.image.ResizeMethod.BILINEAR)
+    input_arr = (tf.expand_dims(input_arr, axis=0),)
+    model_pred = predict_tflite_model(vfib_vfl_model, input_arr )[0]
+    idx = np.argmax(model_pred)
+    return model_pred, classes[idx]
+
+def extract_number(filename):
+    match = re.search(r'(\d+)', os.path.basename(filename))
+    return int(match.group(1)) if match else float('inf')
+
+def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
+    baseline_signal = baseline_construction_200(ecg_signal)
+    low_ecg_signal= lowpass(baseline_signal, cutoff=0.2)
+    label = 'Abnormal'
+    for img_path in glob.glob('vflutter_img/*.jpg'):
+        os.remove(img_path)
+
+    total_data = len(low_ecg_signal)
+    num_phases = 2 if total_data > 1000 else 1  
+    while total_data % num_phases != 0:
+        num_phases += 1  
+
+    step_size = total_data // num_phases 
+
+    fi = 0
+    while fi < total_data:
+        temp_img = low_ecg_signal[fi: fi + step_size]
+        fi += step_size
+        plt.figure()
+        plt.plot(temp_img)
+        plt.axis("off")
+        img_path = f"vflutter_img/p_{fi}.jpg"
+        plt.savefig(img_path)
+        plt.close()
+        aq = cv2.imread(img_path)
+        aq = cv2.resize(aq, (640, 480))
+        cv2.imwrite(img_path, aq)
+
+    combine_result = []
+    label = 'Abnormal'
+
+    files = sorted(glob.glob("vflutter_img/*.jpg"), key=extract_number)
+    for vfib_file in files:
+        with tf.device("CPU"):
+            predictions, ids = prediction_model_vfib_vfl(vfib_file, vfib_vfl_model)
+        #print(predictions, ids)
+        label = "Abnormal" #"Normal"
+        if str(ids) == "VFIB" and float(predictions[0]) > 0.75:
+            label = "VFIB/Vflutter"
+            combine_result.append(label)
+        if str(ids) == "asystole" and float(predictions[1]) > 0.75:
+            label = "ASYS"
+            combine_result.append(label)
+       
+        if str(ids) == "noise" and float(predictions[2]) > 0.75:
+            label = "Noise"
+            combine_result.append(label)
+       
+        if str(ids) == "normal" and float(predictions[3]) > 0.75:
+            label = "Normal"
+            combine_result.append(label)
+
+    temp_label = list(set(combine_result)) 
+    if len(temp_label) > 1:
+        label='Abnormal'
+        if 'ASYS' in temp_label:
+            label = 'ASYS'
+        elif 'Noise' in temp_label:
+            label = 'Noise'
+    else:
+        label = temp_label[0]
+    return label
+   
 def image_array_new(signal):
     scales = np.arange(1, 25, 1)
     coef, freqs = pywt.cwt(signal, scales, 'gaus6')
@@ -5012,18 +5084,18 @@ def extract_number(filename):
     match = re.search(r'(\d+)', os.path.basename(filename))
     return int(match.group(1)) if match else float('inf')
 
-def check_st_model(low_ecg_signal, imageresource):
+def check_st_model(low_ecg_signal):
     label = 'Abnormal'
-    for i in glob.glob(imageresource + "/*.jpg"):
+    for i in glob.glob('temp_mi_img' + "/*.jpg"):
         os.remove(i)
     try:
         randome_number = random.randint(200000, 1000000)
         plt.plot(low_ecg_signal)
         plt.axis("off")
-        plt.savefig(f"{imageresource}/p_{randome_number}.jpg")
-        aq = cv2.imread(f"{imageresource}/p_{randome_number}.jpg")
+        plt.savefig(f"temp_mi_img/p_{randome_number}.jpg")
+        aq = cv2.imread(f"temp_mi_img/p_{randome_number}.jpg")
         aq = cv2.resize(aq, (1080, 460))
-        cv2.imwrite(f"{imageresource}/p_{randome_number}.jpg", aq)
+        cv2.imwrite(f"temp_mi_img/p_{randome_number}.jpg", aq)
         plt.close()
         stdep = []
         stele = []
@@ -5033,7 +5105,7 @@ def check_st_model(low_ecg_signal, imageresource):
         t_abn_list = []
         label = 'Abnormal'
 
-        files = sorted(glob.glob(imageresource +"/*.jpg"), key=extract_number)
+        files = sorted(glob.glob('temp_mi_img' +"/*.jpg"), key=extract_number)
         for pvcfilename in files:
         
             predictions, ids = prediction_model_mi(pvcfilename)
@@ -5064,7 +5136,7 @@ def check_st_model(low_ecg_signal, imageresource):
         print('Inf_lat_error', e)
         return label
 
-def check_mi_model(all_leads_data, imageresource):
+def check_mi_model(all_leads_data):
     print("-------------------- MI detection -------------------------")
     mi_result = 'Abnormal'
     all_lead_det_data = {}
@@ -5075,7 +5147,7 @@ def check_mi_model(all_leads_data, imageresource):
             ecg_signal = all_leads_data[lead].values
             baseline_signal = baseline_construction_200(ecg_signal)
             lowpass_signal = lowpass(baseline_signal)
-            mi_result = check_st_model(lowpass_signal, imageresource)
+            mi_result = check_st_model(lowpass_signal)
             lead_data['mi_result'] = mi_result
             all_lead_det_data[lead] = lead_data
             t_abn.append(mi_result)
@@ -5658,7 +5730,9 @@ def subscribe(client: mqtt_client):
                         except:
                             naa = np.array(OriginalSignal)
                             
-                        final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
+                        # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
+                        final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
+
                         BloodPressure_check = BloodPressure(naa)
 
                         if final_label == "VFIB/Vflutter" and int(timetaken)>=5:
@@ -6926,7 +7000,7 @@ def subscribe(client: mqtt_client):
                                             all_lead_data = data_convert_MI(sorted_data) #, path=save, patient_id
                                             if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
                                                 # label_mi = MIDetection_MI(all_lead_data, 200).check_MI()
-                                                label_mi = check_mi_model(all_lead_data, imageresource)
+                                                label_mi = check_mi_model(all_lead_data)
                                                 if label_rlbbb == "LBBB":
                                                     result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
                                                     d3 = result_data
