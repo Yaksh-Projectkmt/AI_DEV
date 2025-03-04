@@ -1,7 +1,7 @@
 import os
 import cv2
 import json
-import time
+import time,glob
 import logging
 import numpy as np
 import requests
@@ -98,6 +98,7 @@ def image_clustering(dd, input_folder, output_folder, patient):
     if not image_paths:
         dd.update({"template": {"status": "completed"}})
         logging.info("No images found.")
+        client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
         return
 
     # Filter images based on timestamp
@@ -113,6 +114,7 @@ def image_clustering(dd, input_folder, output_folder, patient):
     if not filtered_image_paths:
         dd.update({"template": {"status": "completed"}})
         logging.info("No images within the date range.")
+        client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
         return
 
     logging.info("Extracting embeddings...")
@@ -155,6 +157,9 @@ def request_web(output_folder, patient, dd):
             headers = {'Content-Type': 'application/json'}
             response = requests.post(url, json=payload, headers=headers)
             if response.status_code == 201:
+                dd.update({"template": {"status": "completed"}})
+                client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
+                rmtree(f"BINDATA/{dd['patient']}")
                 logging.info("Request successful: %s", response.text)
             else:
                 logging.error("Request failed with status code: %d", response.status_code)
