@@ -1,7 +1,7 @@
 import os
 import cv2
 import json
-import time
+import time,glob
 import logging
 import numpy as np
 import requests
@@ -86,17 +86,39 @@ def hierarchical_clustering(embeddings, threshold=0.36):
     return clustering.fit_predict(distance_matrix)
 
 def image_clustering(dd, input_folder, output_folder, patient):
-    """Clusters images based on extracted features."""
+    """Clusters images based on extracted features and filters by timestamp."""
     start = time.time()
     os.makedirs(output_folder, exist_ok=True)
 
+    # Extract date range from the JSON object
+    from_date = int(time.mktime(time.strptime(dd['fromDate'], '%Y-%m-%dT%H:%M:%S.%fZ'))) * 1000
+    to_date = int(time.mktime(time.strptime(dd['toDate'], '%Y-%m-%dT%H:%M:%S.%fZ'))) * 1000
+
     image_paths = [os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(".jpg")]
     if not image_paths:
+        dd.update({"template": {"status": "completed"}})
         logging.info("No images found.")
+        client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
+        return
+
+    # Filter images based on timestamp
+    filtered_image_paths = []
+    for filename in image_paths:
+        try:
+            timestamp = int(filename.split("_")[-1].split(".jpg")[0])
+            if from_date <= timestamp <= to_date:
+                filtered_image_paths.append(filename)
+        except ValueError:
+            logging.warning(f"Filename {filename} does not have a valid timestamp format. Skipping.")
+
+    if not filtered_image_paths:
+        dd.update({"template": {"status": "completed"}})
+        logging.info("No images within the date range.")
+        client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
         return
 
     logging.info("Extracting embeddings...")
-    image_embeddings, valid_paths = batch_image_embedding(image_paths)
+    image_embeddings, valid_paths = batch_image_embedding(filtered_image_paths)
     if image_embeddings.size == 0:
         logging.info("No valid embeddings generated.")
         return
@@ -114,6 +136,7 @@ def image_clustering(dd, input_folder, output_folder, patient):
         for path in paths:
             move(path, os.path.join(cluster_folder, os.path.basename(path)))
 
+    [f.unlink() for f in Path(f"pvcs/{patient}").glob("*") if f.is_file()]
     logging.info(f"Clustering complete in {time.time() - start:.2f} seconds.")
     request_web(output_folder, patient, dd)
 
@@ -134,6 +157,9 @@ def request_web(output_folder, patient, dd):
             headers = {'Content-Type': 'application/json'}
             response = requests.post(url, json=payload, headers=headers)
             if response.status_code == 201:
+                dd.update({"template": {"status": "completed"}})
+                client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
+                rmtree(f"BINDATA/{dd['patient']}")
                 logging.info("Request successful: %s", response.text)
             else:
                 logging.error("Request failed with status code: %d", response.status_code)
