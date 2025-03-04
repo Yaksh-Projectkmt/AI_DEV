@@ -195,7 +195,7 @@ output_details_noise = interpreter_noise.get_output_details()
 
 with tf.device('/CPU:0'):
     # tf_cwt_model = load_tflite_model("JR_model_20_09_0_two_different_inputs.tflite")
-    afib_load_model = load_tflite_model("afib_flutter_17_1.tflite")
+    afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
     vfib_vfl_model = load_tflite_model("vfib_trans_mob_1.tflite")
     pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_24.tflite")
     block_load_model = load_tflite_model("Block_convex_2.tflite")
@@ -496,6 +496,8 @@ def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
         label = temp_label[0]
     return label
    
+
+
 def image_array_new(signal):
     scales = np.arange(1, 25, 1)
     coef, freqs = pywt.cwt(signal, scales, 'gaus6')
