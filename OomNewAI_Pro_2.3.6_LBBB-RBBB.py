@@ -628,80 +628,110 @@ def denoise_signal(X, dwt_transform, dlevels, cutoff_low, cutoff_high):
         coeffs[ca]=np.multiply(coeffs[ca],[0.0])
     Y = pywt.waverec(coeffs, dwt_transform) # inverse wavelet transform
     return Y 
-def detect_beats(
-        baseline_signal,  # The raw ECG signal
-        fs,  # Sampling fs in HZ
-        # Window size in seconds to use for
-        ransac_window_size=3.0, #5.0
-        # Low frequency of the band pass filter
-        lowfreq=5.0,
-        # High frequency of the band pass filter
-        highfreq=7.0,
-):
-    ransac_window_size = int(ransac_window_size * fs)
 
-    lowpass = scipy.signal.butter(1, highfreq / (fs / 2.0), 'low')
-    highpass = scipy.signal.butter(1, lowfreq / (fs / 2.0), 'high')
-    # TODO: Could use an actual bandpass filter
-    ecg_low = scipy.signal.filtfilt(*lowpass, x=baseline_signal)
+# def detect_beats(
+#         baseline_signal,  # The raw ECG signal
+#         fs,  # Sampling fs in HZ
+#         # Window size in seconds to use for
+#         ransac_window_size=3.0, #5.0
+#         # Low frequency of the band pass filter
+#         lowfreq=5.0,
+#         # High frequency of the band pass filter
+#         highfreq=7.0,
+# ):
+#     ransac_window_size = int(ransac_window_size * fs)
+
+#     lowpass = scipy.signal.butter(1, highfreq / (fs / 2.0), 'low')
+#     highpass = scipy.signal.butter(1, lowfreq / (fs / 2.0), 'high')
+#     # TODO: Could use an actual bandpass filter
+#     ecg_low = scipy.signal.filtfilt(*lowpass, x=baseline_signal)
+#     ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
+
+#     # Square (=signal power) of the first difference of the signal
+#     decg = np.diff(ecg_band)
+#     decg_power = decg ** 2
+
+#     # Robust threshold and normalizator estimation
+#     thresholds = []
+#     max_powers = []
+#     for i in range(int(len(decg_power) / ransac_window_size)):
+#         sample = slice(i * ransac_window_size, (i + 1) * ransac_window_size)
+#         d = decg_power[sample]
+#         thresholds.append(0.5 * np.std(d))
+#         max_powers.append(np.max(d))
+
+#     threshold = np.median(thresholds)
+#     max_power = np.median(max_powers)
+#     decg_power[decg_power < threshold] = 0
+
+#     decg_power /= max_power
+#     decg_power[decg_power > 1.0] = 1.0
+#     square_decg_power = decg_power ** 4
+#     # square_decg_power = decg_power**4
+
+#     shannon_energy = -square_decg_power * np.log(square_decg_power)
+#     shannon_energy[~np.isfinite(shannon_energy)] = 0.0
+
+#     mean_window_len = int(fs * 0.125 + 1)
+#     lp_energy = np.convolve(shannon_energy, [1.0 / mean_window_len] * mean_window_len, mode='same')
+
+#     lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs / 14.0) # 20.0
+#     lp_energy_diff = np.diff(lp_energy)
+
+#     zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
+#     zero_crossings = np.flatnonzero(zero_crossings)
+#     zero_crossings -= 1
+#     return zero_crossings
+
+def detect_beats(ecg, rate, ransac_window_size=3.35, lowfreq=5.0, highfreq=15.0):
+    ransac_window_size = int(ransac_window_size * rate)
+    lowpass = scipy.signal.butter(1, highfreq / (rate / 2.0), 'low')
+    highpass = scipy.signal.butter(1, lowfreq / (rate / 2.0), 'high')
+    ecg_low = scipy.signal.filtfilt(*lowpass, x=ecg)
     ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
-
-    # Square (=signal power) of the first difference of the signal
     decg = np.diff(ecg_band)
     decg_power = decg ** 2
-
-    # Robust threshold and normalizator estimation
-    thresholds = []
-    max_powers = []
+    thresholds, max_powers = [], []
     for i in range(int(len(decg_power) / ransac_window_size)):
         sample = slice(i * ransac_window_size, (i + 1) * ransac_window_size)
         d = decg_power[sample]
         thresholds.append(0.5 * np.std(d))
         max_powers.append(np.max(d))
-
     threshold = np.median(thresholds)
     max_power = np.median(max_powers)
     decg_power[decg_power < threshold] = 0
-
     decg_power /= max_power
     decg_power[decg_power > 1.0] = 1.0
     square_decg_power = decg_power ** 4
-    # square_decg_power = decg_power**4
-
     shannon_energy = -square_decg_power * np.log(square_decg_power)
     shannon_energy[~np.isfinite(shannon_energy)] = 0.0
-
-    mean_window_len = int(fs * 0.125 + 1)
+    mean_window_len = int(rate * 0.125 + 1)
     lp_energy = np.convolve(shannon_energy, [1.0 / mean_window_len] * mean_window_len, mode='same')
-    # lp_energy = scipy.signal.filtfilt(*lowpass2, x=shannon_energy)
-
-    lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs / 14.0) # 20.0
-    # lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs/8.0)
+    lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, rate / 14.0)
     lp_energy_diff = np.diff(lp_energy)
-
     zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
     zero_crossings = np.flatnonzero(zero_crossings)
     zero_crossings -= 1
 
-    # return zero_crossings
-    # Add check for minimum difference between R peaks
-##    if len(zero_crossings) != 0:
-##        filtered_zero_crossings = [zero_crossings[0]]  # Initialize with the first R peak
-##        for i in range(1, len(zero_crossings)):
-##            if zero_crossings[i] - zero_crossings[i - 1] > 63:
-##                filtered_zero_crossings.append(zero_crossings[i])
-##        filtered_zero_crossings = np.array(filtered_zero_crossings)
-##        return filtered_zero_crossings
-##    else:
-##        lowcut = 0.5
-##        highcut = 50.0
-##        filtered_signal = butter_bandpass_filter(baseline_signal, lowcut, highcut, fs, order=6)
-##       
-##        out = hami.hamilton_segmenter(filtered_signal, sampling_rate=fs)
-##        rpeaks = hami.correct_rpeaks(filtered_signal, out[0], sampling_rate=fs, tol=0.1)
-##        zero_crossings = rpeaks[0].tolist()
-##        zero_crossings = np.array(zero_crossings)
-    return zero_crossings
+    rpeaks = []
+    for idx in zero_crossings:
+        search_window = slice(max(0, idx - int(rate * 0.2)), min(len(ecg), idx + int(rate * 0.1)))
+        local_signal = ecg[search_window]
+        max_amplitude = np.max(local_signal)
+        min_amplitude = np.min(local_signal)
+
+        if abs(max_amplitude) > abs(min_amplitude):  
+            rpeak = np.argmax(local_signal) + search_window.start
+        elif abs(max_amplitude+0.11) < abs(min_amplitude):  
+            rpeak = np.argmin(local_signal) + search_window.start
+        else:  
+            if max_amplitude >= 0:
+                rpeak = np.argmax(local_signal) + search_window.start
+            else:
+                rpeak = np.argmin(local_signal) + search_window.start
+ 
+        rpeaks.append(rpeak)
+    return np.array(rpeaks)
     
 def detect_beats1(
 		ecg,	# The raw ECG signal
