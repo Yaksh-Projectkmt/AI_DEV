@@ -119,33 +119,63 @@ while True:
         print("MQTT NOT CONNECTED")
         time.sleep(1)
 
-
 while True:
     try:
         try:
             while True:
                 client.loop_start()
                 patients = queue.get_all_patient_keys()
-##                data = queue.pop()
                 dic = {}
                 keys_to_delete = []
+
                 for patientname in patients:        
                     p = queue.get_patient_data_count(patientname)
-                    dic.update({patientname:p})
-##                print(dic)
-                for ii,jj in dic.items():
-                    if jj==-1:
-                      keys_to_delete.append(ii)
-                    else:
-                      client.publish(topic_x+"/"+ii,jj,qos=2,retain=True)
-                    if jj==0:
+                    dic[patientname] = p  # Cleaner update syntax
+
+                for ii, jj in dic.items():
+                    if jj == -1 or jj == 0:  # If jj is -1 or 0, mark for deletion
                         keys_to_delete.append(ii)
+                    else:
+                        client.publish(topic_x + "/" + ii, jj, qos=2, retain=True)  # Publish only valid values
+
                 for iii in keys_to_delete:
                     queue.hkeydelete(iii)
                     del dic[iii]
+
                 time.sleep(2)    
         except Exception as e:
             print(e)
             client = connect_mqtt()
     except Exception as e:
-        print("Connection Error:",e)
+        print("Connection Error:", e)
+
+
+#while True:
+#    try:
+#        try:
+#            while True:
+#                client.loop_start()
+#                patients = queue.get_all_patient_keys()
+###                data = queue.pop()
+#                dic = {}
+#                keys_to_delete = []
+#                for patientname in patients:        
+#                    p = queue.get_patient_data_count(patientname)
+#                    dic.update({patientname:p})
+###                print(dic)
+#                for ii,jj in dic.items():
+#                    if jj==-1:
+#                      keys_to_delete.append(ii)
+#                    else:
+#                      client.publish(topic_x+"/"+ii,jj,qos=2,retain=True)
+#                    if jj==0:
+#                        keys_to_delete.append(ii)
+#                for iii in keys_to_delete:
+#                    queue.hkeydelete(iii)
+#                    del dic[iii]
+#                time.sleep(2)    
+#        except Exception as e:
+#            print(e)
+#            client = connect_mqtt()
+#    except Exception as e:
+#        print("Connection Error:",e)
