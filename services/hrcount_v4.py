@@ -16,6 +16,7 @@ import time
 import csv
 import math
 import pandas as pd
+from scipy.ndimage import gaussian_filter1d
 import ssl
 import numpy as np
 import random
@@ -58,6 +59,13 @@ port = 8883
 client_id = f'python-mqtt-{random.randint(900000, 1000000)}'
 username = 'kmt'
 password = 'Kmt123'
+
+
+##broker = 'oomcardiotest.projectkmt.com'
+##port = 8883
+##client_id = f'{random.randint(1000000000000000, 2000000000000000)}'
+##username = 'kmt'
+##password = 'dVBbS3NxMtmzD438'
 
 
 futures = {}
@@ -200,7 +208,7 @@ def hamilton_segmenter(signal=None, sampling_rate=200.0):
     v100ms = int(0.1 * sampling_rate)
     TH_elapsed = np.ceil(0.36 * sampling_rate)
     sm_size = int(0.08 * sampling_rate)
-    init_ecg = 5  # seconds for initialization
+    init_ecg = 6  # seconds for initialization
     if dur < init_ecg:
         init_ecg = int(dur)
 
@@ -488,6 +496,62 @@ def hr_count(ecg_signal, fs=200):
         return hr
     return 0
 
+def detect_rpeaks_eq(ecg, rate, ransac_window_size=3.35, lowfreq=5.0, highfreq=13.0):
+    ransac_window_size = int(ransac_window_size * rate)
+    lowpass = scipy.signal.butter(1, highfreq / (rate / 2.0), 'low')
+    highpass = scipy.signal.butter(1, lowfreq / (rate / 2.0), 'high')
+    ecg_low = scipy.signal.filtfilt(*lowpass, x=ecg)
+    ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
+    decg = np.diff(ecg_band)
+    decg_power = decg ** 2
+    thresholds, max_powers = [], []
+    for i in range(int(len(decg_power) / ransac_window_size)):
+        sample = slice(i * ransac_window_size, (i + 1) * ransac_window_size)
+        d = decg_power[sample]
+        thresholds.append(0.5 * np.std(d))
+        max_powers.append(np.max(d))
+    
+    threshold = np.median(thresholds)
+    max_power = np.median(max_powers)
+    decg_power[decg_power < threshold] = 0
+    decg_power /= max_power
+    decg_power[decg_power > 1.0] = 1.0
+    square_decg_power = decg_power ** 4
+    
+    shannon_energy = -square_decg_power * np.log(square_decg_power)
+    shannon_energy[~np.isfinite(shannon_energy)] = 0.0
+    
+    mean_window_len = int(rate * 0.125 + 1)
+    lp_energy = np.convolve(shannon_energy, [1.0 / mean_window_len] * mean_window_len, mode='same')
+    lp_energy = gaussian_filter1d(lp_energy, rate / 14.0)
+    lp_energy_diff = np.diff(lp_energy)
+    
+    zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
+    zero_crossings = np.flatnonzero(zero_crossings)
+    zero_crossings -= 1
+    
+    
+   
+    rpeaks = []
+    for idx in zero_crossings:
+        search_window = slice(max(0, idx - int(rate * 0.2)), min(len(ecg), idx + int(rate * 0.1)))
+        local_signal = ecg[search_window]
+        max_amplitude = np.max(local_signal)
+        min_amplitude = np.min(local_signal)
+        if abs(max_amplitude) > abs(min_amplitude):
+            rpeak = np.argmax(local_signal) + search_window.start
+        elif abs(max_amplitude+0.11) < abs(min_amplitude):
+            rpeak = np.argmin(local_signal) + search_window.start
+        else:  
+            if max_amplitude >= 0:
+                rpeak = np.argmax(local_signal) + search_window.start
+            else:
+                rpeak = np.argmin(local_signal) + search_window.start
+
+        rpeaks.append(rpeak)
+    
+    return np.array(rpeaks)
+    
 def one_min_hr(patient_id, fs = 200):
     global client
     try:
@@ -505,7 +569,8 @@ def one_min_hr(patient_id, fs = 200):
         naa = np.array(ecg_signal)
         ecg_signal = MinMaxScaler(feature_range=(0,4)).fit_transform(naa.reshape(-1,1)).squeeze()
 
-        rpeaks = hamilton_segmenter(signal = ecg_signal)["rpeaks"]
+        #rpeaks = hamilton_segmenter(signal = ecg_signal)["rpeaks"]
+        rpeaks = detect_rpeaks_eq(ecg_signal,200)
     ##    rpeaks = detect_beats(naa, float(fa))
     ##    times = len(dataconversion)/200
     ##    HR = int(60*int(len(rpeaks))/times)
@@ -580,10 +645,11 @@ def one_min_hr(patient_id, fs = 200):
     ##    maxtime = max(datetimee)
         result_data = {"patient":patient_id,"HR":str(mean_hr),"beats":len(rpeaks),"RRInterval":str(SAf[0]),"PRInterval":str(PRpeaks),"QTInterval":str(QTpeaks),"QRSComplex":str(SQpeaks),"STseg":str(STseg),"PRseg":str(PRseg),"ecgPackage":"All-Arrhythmia"}
         topic_y = "oom/ecg/processedDataThreeSec/"+str(patient_id)
-        #print("LOG of "+topic_y+":",result_data)
+        print("LOG of "+topic_y+":",result_data)
         client.publish(topic_y,json.dumps(result_data),qos=2)
 
-    except:
+    except Exception as e:
+        print(e)
         pass
         #print("Unknown Execption Occur")
         
