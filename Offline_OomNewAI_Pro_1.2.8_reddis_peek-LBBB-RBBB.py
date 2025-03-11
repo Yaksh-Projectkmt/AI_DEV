@@ -205,7 +205,7 @@ os.makedirs(folder_path)
 
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_45_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_46_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
