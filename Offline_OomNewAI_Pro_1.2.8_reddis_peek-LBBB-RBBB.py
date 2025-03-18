@@ -175,7 +175,7 @@ class RedisQueue:
 
 redis_conn = redis.StrictRedis(host='localhost', port=6379, db=0)
 # Create a queue instance
-queue = RedisQueue('liveOfflinechannel', redis_conn)
+queue = RedisQueue('devOfflinechannel', redis_conn)
 
 #AI Detectron to Detect PVC Curve
 results_lock = threading.RLock()
@@ -222,7 +222,7 @@ output_details_noise = interpreter_noise.get_output_details()
 with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
     vfib_vfl_model = load_tflite_model("vfib_trans_mob_1.tflite")
-    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_25.tflite")
+    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_27.tflite")
     block_load_model = load_tflite_model("Block_Trans_mob_2.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
 
