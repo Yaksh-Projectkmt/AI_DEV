@@ -138,31 +138,46 @@ def image_clustering(dd, input_folder, output_folder, patient):
 
     [f.unlink() for f in Path(f"pvcs/{patient}").glob("*") if f.is_file()]
     logging.info(f"Clustering complete in {time.time() - start:.2f} seconds.")
-    request_web(output_folder, patient, dd)
+    request_web(None,output_folder, patient, dd)
 
-def request_web(output_folder, patient, dd):
+def request_web(destination_path, output_folder, patient, dd):
     """Send a request to a web server with clustering results."""
-    url = 'http://191.169.1.9:5000/api/v1/template/images'
+    patient_folder_name = output_folder
     image_list_data = []
-    
-    for bin_list in os.listdir(output_folder):
-        images = [int(f.split("_")[-1].split(".jpg")[0]) for f in glob.glob(f"{output_folder}/{bin_list}/*.jpg")]
-        if images:
-            payload = {
-                "name": bin_list,
-                "patient": patient,
-                "templateName": "Ventricular",
-                "images": [{"startTime": min(images), "endTime": max(images)}]
+
+    for bin_list in os.listdir(patient_folder_name):
+        image_list_data = []
+        for imagelist in glob.glob(patient_folder_name + "/" + bin_list + "/" + "*.jpg"):
+            timestamp = imagelist.split("/")[-1].split("_")[-1].split(".jpg")[0]
+            image_data = {
+                "startTime": int(timestamp),
+                "endTime": int(timestamp)
             }
-            headers = {'Content-Type': 'application/json'}
-            response = requests.post(url, json=payload, headers=headers)
-            if response.status_code == 201:
-                dd.update({"template": {"status": "completed"}})
-                client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
-                rmtree(f"BINDATA/{dd['patient']}")
-                logging.info("Request successful: %s", response.text)
-            else:
-                logging.error("Request failed with status code: %d", response.status_code)
+            image_list_data.append(image_data)
+
+        url = 'http://191.169.1.9:5000/api/v1/template/images?'
+        params = {
+            'patient': patient,
+            'templateName': 'Ventricular',
+            'name': bin_list
+        }
+        payload = {
+            "name": bin_list,
+            "patient": patient,
+            "templateName": "Ventricular",
+            "images": image_list_data
+        }
+        headers = {'Content-Type': 'application/json'}
+
+        response = requests.post(url, params=params, headers=headers, json=payload)
+        print(payload)
+    if response.status_code == 201:
+        logging.info("Request successful: %s", response.text)
+        dd.update({"template": {"status": "completed"}})
+        client.publish("oom/ecg/templateUpdateRpm", json.dumps(dd), qos=2)
+        rmtree(f"BINDATA/{dd['patient']}")
+    else:
+        logging.error("Request failed with status code: %d", response.status_code)
 
 def subscribe(client):
     """Subscribe to MQTT messages and process clustering tasks."""
