@@ -131,7 +131,7 @@ folder_path = os.path.join("rawdata/", random_folder_name)
 os.makedirs(folder_path)
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_47_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_48_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -146,9 +146,9 @@ output_details_noise = interpreter_noise.get_output_details()
 
 with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
-    vfib_vfl_model = load_tflite_model("vfib_trans_mob_1.tflite")
+    vfib_vfl_model = load_tflite_model("vfib_trans_mob_3.tflite")
     pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_27.tflite")
-    block_load_model = load_tflite_model("Block_Trans_mob_10_super_new.tflite")
+    block_load_model = load_tflite_model("Block_Trans_mob_14_super_new.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
     
 def prediction_model_PAC(input_arr, target_shape=[224, 224], class_name=True):
@@ -601,12 +601,28 @@ def check_noise_model(ecg_signal, frequency):
             noise_label = 'high_noise'
     return noise_label
 
-def noise_engine(flag,ecgdata):
+def noise_engine(all_leads_data, version):
     noise_label = 'Normal'
-    if flag == "200":
-        ecg_signal = np.array(ecgdata["ECG"])
-        noise_label = check_noise_model(ecg_signal, 200)
-
+    # if flag == "200":
+    #     ecg_signal = np.array(ecgdata["ECG"])
+    #     noise_label = check_noise_model(ecg_signal, 200)
+    noise_result_dic = {}
+    noise_results = []
+    for lead in all_leads_data.keys():
+        ecg_signal = all_leads_data[lead].values
+        ecg_signal = np.asarray(ecg_signal).ravel()
+        get_noise = check_noise_model(ecg_signal, 200)
+        noise_results.append(get_noise)
+        noise_result_dic[lead] = noise_results
+    noise_cou = noise_results.count('high_noise')
+    if version == 2:
+        if noise_result_dic['II'] == 'high_noise':
+            noise_label = 'high_noise'
+    elif version == 5:
+        if noise_result_dic['I'] == 'high_noise' and noise_result_dic['II'] == 'high_noise':
+            noise_label = 'high_noise'
+        elif noise_result_dic['I'] == 'high_noise' or noise_result_dic['v5'] == 'high_noise':
+            noise_label = 'high_noise'
     return noise_label
     
 def unique(list1):
@@ -4112,7 +4128,7 @@ def check_qs_index(all_leads_data, r_index ,frequency, version):
     s_index, q_index = [], []
     combine_indexs = {}
     
-    for lead in all_leads_data.columns:
+    for lead in all_leads_data.keys():
         if lead in ["I",'II', 'III']:
             ecg_signal = all_leads_data[lead].values
             baseline_signal = baseline_construction_200(ecg_signal, 101)
@@ -4427,7 +4443,7 @@ class PVCDetection:
 
                     for pvcfilename in files:
                         predictions,ids = prediction_model(pvcfilename)
-                        print(predictions,ids)
+                        # print(predictions,ids)
                         if str(ids) == "PVC" and float(predictions[3])>0.92:
                             observer.append(1)
                             plot_r_index = int(pvcfilename.split("_")[-1].split(".jpg")[0])
@@ -4553,7 +4569,6 @@ class PACDetection:
         print("----------------------- PAC detection -----------------------------")
         all_lead_pac_data, results_pac = {}, {}
         all_lead_data = self.get_signal
-        
         for lead in all_lead_data.keys():
             if lead in ['I', 'II', 'III']: #['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']:
                 lead_data = {}
@@ -4648,55 +4663,63 @@ class PACDetection:
                     lead_data['pac_counts'] = pac_data
                     lead_data['variations'] = variations
                     all_lead_pac_data[lead] = lead_data
-        if len(all_lead_pac_data.keys()) > 1:
-            results_pac = {}
-            combined_labels = []
-            pvc_final_label, jnc_label = 'Abnormal', 'Abnormal'
-            for data in all_lead_pac_data.values():
-                temp_label = data['pac_label'].split('; ')
-                if len(temp_label) > 1:
-                    combined_labels.extend(temp_label)
+        if all_lead_pac_data:
+            if len(all_lead_pac_data.keys()) > 1:
+                results_pac = {}
+                combined_labels = []
+                pvc_final_label, jnc_label = 'Abnormal', 'Abnormal'
+                for data in all_lead_pac_data.values():
+                    temp_label = data['pac_label'].split('; ')
+                    if len(temp_label) > 1:
+                        combined_labels.extend(temp_label)
+                    else:
+                        combined_labels.append(data['pac_label'])
+                    combined_labels.append(data['junctional_label'])
+                label_counts = Counter(combined_labels)
+                repeated_elements = [item for item, count in label_counts.items() if count > 1]
+                
+                if 'SVT' in label_counts and label_counts['SVT'] != 3:
+                    repeated_elements.remove('PAC-SVT')
+                
+                if 'Junctional_Rhythm' in label_counts and label_counts['Junctional_Rhythm'] > 1:
+                    jnc_label = 'Junctional_Rhythm'
+                    if 'Junctional_Rhythm' in repeated_elements:
+                        repeated_elements.remove('Junctional_Rhythm')
+                elif 'Junctional_Bradycardia' in label_counts and label_counts['Junctional_Bradycardia'] > 1:
+                    jnc_label = 'Junctional_Bradycardia'
+                    if 'Junctional_Bradycardia' in repeated_elements:
+                        repeated_elements.remove('Junctional_Bradycardia')
+                is_pac_present = any(map(lambda x: 'PAC' in x, repeated_elements))
+                if is_pac_present and 'Abnormal' in repeated_elements:
+                    repeated_elements.remove('Abnormal')
+
+                pvc_final_label = ' '.join(repeated_elements)
+                pac_matching_keys, junc_matching_keys = [], []
+                pac_matching_keys = [
+                    key for key, data in all_lead_pac_data.items()
+                    if any(element in data['pac_label'] for element in repeated_elements)
+                ]
+                if pac_matching_keys:
+                    results_pac['pac_index'] = all_lead_pac_data[pac_matching_keys[0]]['pac_detect']
+                    results_pac['pac_union'] = all_lead_pac_data[pac_matching_keys[0]]['updated_union']
+                    results_pac['pac_counts']= all_lead_pac_data[pac_matching_keys[0]]['pac_counts']
+                    results_pac['variations'] = all_lead_pac_data[pac_matching_keys[0]]['variations']
                 else:
-                    combined_labels.append(data['pac_label'])
-                combined_labels.append(data['junctional_label'])
-            label_counts = Counter(combined_labels)
-            repeated_elements = [item for item, count in label_counts.items() if count > 1]
-            
-            if 'SVT' in label_counts and label_counts['SVT'] != 3:
-                repeated_elements.remove('PAC-SVT')
-            
-            if 'Junctional_Rhythm' in label_counts and label_counts['Junctional_Rhythm'] > 1:
-                jnc_label = 'Junctional_Rhythm'
-                if 'Junctional_Rhythm' in repeated_elements:
-                    repeated_elements.remove('Junctional_Rhythm')
-            elif 'Junctional_Bradycardia' in label_counts and label_counts['Junctional_Bradycardia'] > 1:
-                jnc_label = 'Junctional_Bradycardia'
-                if 'Junctional_Bradycardia' in repeated_elements:
-                    repeated_elements.remove('Junctional_Bradycardia')
-            is_pac_present = any(map(lambda x: 'PAC' in x, repeated_elements))
-            if is_pac_present and 'Abnormal' in repeated_elements:
-                repeated_elements.remove('Abnormal')
-
-            pvc_final_label = ' '.join(repeated_elements)
-            pac_matching_keys, junc_matching_keys = [], []
-            pac_matching_keys = [
-                key for key, data in all_lead_pac_data.items()
-                if any(element in data['pac_label'] for element in repeated_elements)
-            ]
-
-            results_pac['pac_index'] = all_lead_pac_data[pac_matching_keys[0]]['pac_detect']
-            results_pac['pac_union'] = all_lead_pac_data[pac_matching_keys[0]]['updated_union']
-            results_pac['pac_label'] = pvc_final_label
-            results_pac['jnc_label'] = jnc_label
-            results_pac['pac_counts']= all_lead_pac_data[pac_matching_keys[0]]['pac_counts']
-            results_pac['variations'] = all_lead_pac_data[pac_matching_keys[0]]['variations']
-        else:
-            results_pac['pac_index'] = all_lead_pac_data['II']['pac_detect']
-            results_pac['pac_union'] = all_lead_pac_data['II']['updated_union']
-            results_pac['pac_label'] =all_lead_pac_data['II']['pac_label']
-            results_pac['jnc_label'] = all_lead_pac_data['II']['junctional_label']
-            results_pac['pac_counts']= all_lead_pac_data['II']['pac_counts']
-            results_pac['variations'] = all_lead_pac_data['II']['variations']
+                    results_pac['pac_index'] = []
+                    results_pac['pac_union'] = []
+                    results_pac['pac_counts'] = {}
+                    results_pac['variations'] = []
+                
+                results_pac['pac_label'] = pvc_final_label
+                results_pac['jnc_label'] = jnc_label
+                
+            else:
+                results_pac['pac_index'] = all_lead_pac_data['II']['pac_detect']
+                results_pac['pac_union'] = all_lead_pac_data['II']['updated_union']
+                results_pac['pac_label'] =all_lead_pac_data['II']['pac_label']
+                results_pac['jnc_label'] = all_lead_pac_data['II']['junctional_label']
+                results_pac['pac_counts']= all_lead_pac_data['II']['pac_counts']
+                results_pac['variations'] = all_lead_pac_data['II']['variations']
         return results_pac
    
     def pac_count_find(self, PAC_R_Peaks, hr_counts):
@@ -5215,7 +5238,13 @@ def subscribe(client: mqtt_client):
                 
                 OriginalSignal = MinMaxScaler(feature_range=(0,4)).fit_transform(np.array(OriginalSignal).reshape(-1,1)).squeeze()
                 ecgdata = pd.DataFrame({"ECG":OriginalSignal})
-                final_output = noise_engine(flag = "200",ecgdata=ecgdata)
+                fs = 200
+                all_lead_data = {}
+                if version == 5:
+                    all_lead_data = data_convert_MI(sorted_data)
+                elif version == 2:
+                    all_lead_data = pd.DataFrame({'II': OriginalSignal})
+                final_output = noise_engine(all_lead_data, int(version))
                 mintime = min(datetimee)
                 maxtime = max(datetimee)
                 maxtimes = datetime.datetime.fromtimestamp(int(maxtime)/1000)
@@ -5503,12 +5532,7 @@ def subscribe(client: mqtt_client):
 
                             newdada = aboutdata["ECG"]
                             naa = np.array(newdada)
-                            fs = 200
-                            all_lead_data = {}
-                            if version == 5:
-                                all_lead_data = data_convert_MI(sorted_data)
-                            elif version == 2:
-                                all_lead_data = pd.DataFrame({'II': OriginalSignal})
+                            
                             # 2, 7 lead according r peak detection
                             rpeaks = check_r_index(all_lead_data, fs, int(version))
                             s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
