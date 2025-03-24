@@ -218,7 +218,7 @@ def remove_temp_folder(folder_path):
     else:
         print(f"Folder '{folder_path}' does not exist.")
 
-def prediction_model_vfib_vfl(input_arr, vfib_vfl_model):
+def prediction_model_vfib_vfl(input_arr):
     classes = ['VFIB', 'asystole', 'noise', 'normal']
     input_arr = tf.io.decode_jpeg(tf.io.read_file(input_arr), channels=3)
     input_arr = tf.image.resize(input_arr, size=(224, 224), method=tf.image.ResizeMethod.BILINEAR)
@@ -232,7 +232,7 @@ def extract_number(filename):
     match = re.search(r'(\d+)', os.path.basename(filename))
     return int(match.group(1)) if match else float('inf')
 
-def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
+def check_vfib_vfl_model(ecg_signal):
     baseline_signal = baseline_construction_200(ecg_signal)
     low_ecg_signal= lowpass(baseline_signal, cutoff=0.2)
     label = 'Abnormal'
@@ -267,7 +267,7 @@ def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
     files = sorted(glob.glob(f"{folder_path}/*.jpg"), key=extract_number)
     for vfib_file in files:
         with tf.device("CPU"):
-            predictions, ids = prediction_model_vfib_vfl(vfib_file, vfib_vfl_model)
+            predictions, ids = prediction_model_vfib_vfl(vfib_file)
         #print(predictions, ids)
         label = "Abnormal" #"Normal"
         if str(ids) == "VFIB" and float(predictions[0]) > 0.75:
@@ -298,6 +298,38 @@ def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
     else:
         label = temp_label[0]
     return label
+
+def Vfib_asys_detection(all_leads_data):
+    vifib_asys_result = 'Abnormal'
+    all_lead_det_data = {}
+    vifib_results = []
+    for lead in all_leads_data.keys():
+        lead_data = {}
+        if lead in [ 'I','II', 'III']:
+            ecg_signal = all_leads_data[lead].values
+            # baseline_signal = baseline_construction_200(ecg_signal)
+            # lowpass_signal = lowpass(baseline_signal)
+            vi_model_result = check_vfib_vfl_model(ecg_signal)
+            lead_data['vfib_result'] = vi_model_result
+            all_lead_det_data[lead] = lead_data
+            vifib_results.append(vi_model_result)
+    if len(all_lead_det_data.keys()) > 1:
+        flat_list = []
+        for element in vifib_results:
+            if isinstance(element, list):
+                flat_list.extend(element)
+            else:
+                flat_list.append(element)
+        counts = Counter(flat_list)
+        repeated_elements = [item for item, count in counts.items() if count > 1 and item != 'Abnormal']
+        vfib_vfl_lab = ' '.join(repeated_elements)
+        if vfib_vfl_lab:
+            vifib_asys_result = vfib_vfl_lab
+        else:
+            vifib_asys_result = "Abnormal"
+    else:
+        vifib_asys_result =  all_lead_det_data['II']['vfib_result']
+    return vifib_asys_result
 
 
 def image_array_new(signal):
@@ -4160,214 +4192,125 @@ class PVCDetection:
         self.date_time = date_time
         self.patientid = patientid
 
-    def pvc_count_finds(self, bb, HR):
-        # Bigem
-        bigem = []
-        bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count  = 0, 0, 0, 0, 0, 0, 0, 0
-        for q,k in enumerate(bb):
-            if len(bigem) == 3:
-                bigem_count+=1
-                try:
-                    if bb[q] ==0 and bb[q+1]==1:
-                        bigem.clear()
-                        bigem.append(1)
-                    else:
-                        bigem.clear()
-                except:
-                    bigem.clear()
-            if len(bigem ) ==0 and k ==1:
-                bigem.append(1)
-            elif len(bigem) ==1 and k ==0:
-
-                bigem.append(0)
-            elif len(bigem) ==2 and k ==1:
-                bigem.append(1)
+    def pvc_count_finds(self, sequence, HR):
+        triplet_pattern = [1, 1, 1]
+        couplet_pattern = [1, 1]
+        bigem_pattern = [1, 0, 1]
+        trigeminy_pattern = [1, 0, 0, 1]
+        quadrigeminy_pattern = [1, 0, 0, 0, 1]
+    
+        triplet_count = 0
+        couplet_count = 0
+        bigem_count = 0
+        trigeminy_count = 0
+        quadrigeminy_count = 0
+        aivr_count = 0
+        ivr_count = 0
+        nsvt_count = 0
+        vt_count = 0
+        beat_indices = set()
+    
+        def matches(subsequence, pattern):
+            return subsequence == pattern
+    
+        i = 0
+        while i < len(sequence):
+            if sequence[i] == 1:
+                start = i
+                while i < len(sequence) and sequence[i] == 1:
+                    i += 1
+                length = i - start
+                if length == 4 and int(HR)<=60:
+                    ivr_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+                elif length >= 4 and (int(HR)>60 and int(HR)<=300):
+                    aivr_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+                elif 5 <= length <= 9 and (int(HR)>60 and int(HR)<=300):
+                    nsvt_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+                elif length >= 10 and int(HR)>100:
+                    vt_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
             else:
-                if len(bigem)==1 and (1 in bigem) and k==1:
-                    bigem.clear()
-                    bigem.append(1)
-                elif len(bigem)>1: 
-                    bigem.clear()
-                    if k ==1:
-                        bigem.append(1)                                                    
-        if len(bigem) == 3:
-            bigem_count+=1
-            bigem.clear()
+                i += 1
+    
+        
+        for i in range(len(sequence)):
+            # Triplet
+            if i + 3 <= len(sequence):
+                subseq = sequence[i:i+3]
+                if matches(subseq, triplet_pattern):
+                    if all(j not in beat_indices for j in range(i, i+3)):
+                        triplet_count += 1
+                        for j in range(i, i+3):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Couplet
+            if i + 2 <= len(sequence):
+                subseq = sequence[i:i+2]
+                if matches(subseq, couplet_pattern):
+                    if all(j not in beat_indices for j in range(i, i+2)):
+                        couplet_count += 1
+                        for j in range(i, i+2):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Bigeminy
+            if i + 3 <= len(sequence):
+                subseq = sequence[i:i+3]
+                if matches(subseq, bigem_pattern):
+                    if all(j not in beat_indices for j in range(i, i+3)):
+                        bigem_count += 1
+                        for j in range(i, i+3):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Trigeminy
+            if i + 4 <= len(sequence):
+                subseq = sequence[i:i+4]
+                if matches(subseq, trigeminy_pattern):
+                    if all(j not in beat_indices for j in range(i, i+4)):
+                        trigeminy_count += 1
+                        for j in range(i, i+4):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Quadrigeminy
+            if i + 5 <= len(sequence):
+                subseq = sequence[i:i+5]
+                if matches(subseq, quadrigeminy_pattern):
+                    if all(j not in beat_indices for j in range(i, i+5)):
+                        quadrigeminy_count += 1
+                        for j in range(i, i+5):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+    
+        # Isolated PVCs
+        isolated_beats = 0
+        for idx, val in enumerate(sequence):
+            if val == 1 and idx not in beat_indices:
+                isolated_beats += 1
+                beat_indices.add(idx)
+    
+        total_beats = len(beat_indices)
+    
+        return {
+            "Isolated": isolated_beats,
+            "Bigeminy": bigem_count,
+            "Trigeminy": trigeminy_count,
+            "Quadrigeminy": quadrigeminy_count,
+            "Couplet": couplet_count,
+            "Triplet": triplet_count,
+            "Aivr": aivr_count,
+            "IVR": ivr_count,
+            "NSVT": nsvt_count,
+            "VT": vt_count,
+            "Total Beats": total_beats
+        }
 
-        # Trigeminy 
-        Trigem = []
-        Trigem_count = 0
-        for m,l in enumerate(bb):
-            if len(Trigem) == 4:
-                Trigem_count+=1
-                try:
-                    if bb[m] ==0 and bb[m+1]==0 and bb[m+2]==1:
-                        Trigem.clear()
-                        Trigem.append(1)
-                    else:
-                        Trigem.clear()
-                except:
-                    Trigem.clear()
-
-            if len(Trigem) ==0 and l ==1:
-                Trigem.append(1)
-            elif len(Trigem) ==1 and l ==0:
-                Trigem.append(0)
-            elif len(Trigem) ==2 and l ==0:
-                Trigem.append(0)
-            elif len(Trigem) ==3 and l ==1:
-                Trigem.append(1)
-            else:
-                if len(Trigem)==1 and (1 in Trigem) and l==1:
-                    Trigem.clear()
-                    Trigem.append(1)
-                elif len(Trigem)>1: 
-                    Trigem.clear()
-                    if l ==1:
-                        Trigem.append(1)
-        if len(Trigem) == 4:
-            Trigem_count+=1
-            Trigem.clear()
-
-        # Quadrageminy
-        Quadgem = []
-        Quadgem_count = 0
-        for p,o in enumerate(bb):
-            if len(Quadgem) == 5:
-                Quadgem_count+=1
-                try:
-                    if bb[p] ==0 and bb[p+1]==0 and bb[p+2]==0 and bb[p+3]==1:
-                        Quadgem.clear()
-                        Quadgem.append(1)
-                    else:
-                        Quadgem.clear()
-                except:
-                    Quadgem.clear()
-            if len(Quadgem) ==0 and o ==1:
-                Quadgem.append(1)
-            elif len(Quadgem) ==1 and o ==0:   
-                Quadgem.append(0)
-            elif len(Quadgem) ==2 and o ==0:
-                Quadgem.append(0)
-            elif len(Quadgem) ==3 and o ==0:
-                Quadgem.append(0)
-            elif len(Quadgem) ==4 and o ==1:
-                Quadgem.append(1)
-            else:
-                if len(Quadgem)==1 and (o in Quadgem) and o==1:
-                    Quadgem.clear()
-                    Quadgem.append(1)
-                elif len(Quadgem)>1: 
-                    Quadgem.clear()
-                    if o ==1:
-                        Quadgem.append(1)
-        if len(Quadgem) == 5:
-            Quadgem_count+=1
-            Quadgem.clear()
-
-        ll=bb
-        couplet = []
-        c_count=0
-        for i in ll:
-            if i==1:
-                couplet.append(1)
-                if len(couplet)==3:
-                    c_count-=1
-                    couplet.clear()
-
-                if len(couplet)==2: 
-                    c_count+=1
-                    
-                if 0 in couplet:
-                    if c_count==0:
-                        pass
-                    else:
-                        c_count-=1
-                    couplet.clear()
-            else:
-                couplet.clear()
-
-        triplet = []
-        t_count=0
-        for i in ll:
-            if i==1:
-                triplet.append(1)
-                if len(triplet)>=4:
-                    t_count-=1
-                    triplet.clear()
-                if len(triplet)==3:
-                    t_count+=1
-
-                if 0 in triplet:
-                    if t_count==0:
-                        pass
-                    else:
-                        t_count-=1
-                    triplet.clear()
-            else:
-                triplet.clear()
-
-        if int(HR)>100:
-            vt = []
-            vt_count=0
-            for i in ll:
-                if i==1:
-                    vt.append(1)
-                    if len(vt)>=4:
-                        vt_count+=1
-                        vt.clear()
-                    if 0 in vt:
-                        if vt_count==0:
-                            pass
-                        else:
-                            vt_count-=1
-                        vt.clear()
-                else:
-                    vt.clear()
-
-        if int(HR)>60 and int(HR)<=300:
-            aivr = []
-            aivr_count=0
-            for i in ll:
-                if i==1:
-                    aivr.append(1)
-                    if len(aivr)>=4:
-                        aivr_count+=1
-                        aivr.clear()
-                    if 0 in aivr:
-                        if aivr_count==0:
-                            pass
-                        else:
-                            aivr_count-=1
-                        aivr.clear()     
-                else:
-                    aivr.clear()
-        if int(HR)<=60:
-            ivr = []
-            ivr_count=0
-            for i in ll:
-                if i==1:
-                    ivr.append(1)
-                    if len(ivr)>=4:
-                        ivr_count+=1
-                        ivr.clear()
-                    if 0 in ivr:
-                        if ivr_count==0:
-                            pass
-                        else:
-                            ivr_count-=1
-                        ivr.clear()
-                else:
-                    ivr.clear()
-        total_one = (1*vt_count) + (c_count*2)+ (t_count*3)+ (bigem_count*2)+ (Trigem_count*2)+ (Quadgem_count*2)
-        total = bigem_count+ Trigem_count+ Quadgem_count+ c_count+ t_count+ vt_count+ aivr_count+ ivr_count
-        ones = bb.count(1)
-        if total == 0:
-            Isolated = ones
-        else:
-            Common = total-1
-            Isolated = ones-(total_one-Common)
-        return  bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count, Isolated
+    
 
     def get_pvc_data(self):
         print("---------------- PVC detection --------------------")
@@ -4469,15 +4412,16 @@ class PVCDetection:
                     lbbb_index = [rpeaks[i] for i in range(len(LBBB_list)) if LBBB_list[i] == 1]
                     rbbb_index = [rpeaks[i] for i in range(len(RBBB_list)) if RBBB_list[i] == 1]
                     pvc_label_counts = {
-                        'PVC-Isolated_counter': Isolated,
-                        'PVC-Bigeminy_counter': bigem_count,
-                        'PVC-Trigeminy_counter': Trigem_count,
-                        'PVC-Quadrigeminy_counter':Quadgem_count,
-                        'PVC-Couplet_counter':c_count,
-                        'PVC-Triplet_counter':t_count,
-                        'PVC-NSVT_counter':vt_count,
-                        'PVC-Aivr_counter':aivr_count,
-                        'PVC-Ivr_counter':ivr_count,
+                        'PVC-Isolated_counter': counts_result['Isolated'],
+                        'PVC-Bigeminy_counter': counts_result['Bigeminy'],
+                        'PVC-Trigeminy_counter': counts_result['Trigeminy'],
+                        'PVC-Quadrigeminy_counter':counts_result['Quadrigeminy'],
+                        'PVC-Couplet_counter':counts_result['Couplet'],
+                        'PVC-Triplet_counter':counts_result['Triplet'],
+                        'PVC-NSVT_counter':counts_result['NSVT'],
+                        'PVC-Aivr_counter':counts_result['Aivr'],
+                        'PVC-Ivr_counter':counts_result['IVR'],
+                        'PVC-VT_counter':counts_result['VT'],
                         'pvc_r_index': r_index_plot,
                     }
                     pvc_label = '; '.join([key.split('_')[0] for key, val in pvc_label_counts.items() if 'counter' in key and val > 0])
@@ -4515,6 +4459,10 @@ class PVCDetection:
                     repeated_elements.remove('PVC-Aivr')
                 if 'Ivr' in label_counts and label_counts['Ivr'] != 3:
                     repeated_elements.remove('PVC-Ivr')
+
+                if len(repeated_elements) > 1:
+                    if 'Abnormal' in repeated_elements:
+                        repeated_elements.remove('Abnormal')
                 pvc_final_index = ' '.join(repeated_elements)
                 result_pvc_data['pvc_label'] = pvc_final_index
                 pvc_matching_keys, lbbb_rbbb_matching_keys = [], []
@@ -5419,107 +5367,104 @@ def subscribe(client: mqtt_client):
                         naa = np.array(OriginalSignal)
                         
                     # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
-                    final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
+                    # final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
+                    final_label = Vfib_asys_detection(all_lead_data)
 
                     BloodPressure_check = BloodPressure(naa)
 
-                    if final_label == "VFIB/Vflutter" and int(timetaken)>=5:
+                    if "VFIB/Vflutter" in final_label and int(timetaken)>=5: # final_label == "VFIB/Vflutter"
+                        na = np.array(OriginalSignal)
+                        rpeaks = detect_beats(na, float(200))
+                        beats = []
+                        for nnn in rpeaks:
+                                beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+                        try:
+                            br,hrv = BPM(rpeaks)
+                        except:
+                            br,hrv = 0,[]
+
+                        mintime = min(datetimee)
+                        maxtime = max(datetimee)
+                        maxtimes = datetime.datetime.fromtimestamp(int(maxtime)/1000)
+                        maxtimesnewtime =maxtimes.strftime("%Y-%m-%d %H:%M:%S")
+                        DT2 = parser.parse(maxtimesnewtime)
+                        mintimes = datetime.datetime.fromtimestamp(int(mintime)/1000)
+                        mintimesnewtime = mintimes.strftime("%Y-%m-%d %H:%M:%S")
+                        DT1 = parser.parse(mintimesnewtime)
+                        timetaken = int((DT2 - DT1).total_seconds())
+
+                        try:
+                            HR = int(60*int(len(rpeaks))/(timetaken))
+                            if abs(timetaken)<5:
+                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
+                                print("LOG:",result_data)
+                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                            else:
+                                result_data = [{"patient":dd["patient"],"HR":int(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'VFIB','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                print("LOG:",result_data)
+                                for i in result_data:
+                                    x = mycol.insert_one(dict(i))
+
+                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                        except Exception as e:
+                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
+                                print("LOG6:",result_data,e)
+                                client.publish(topic_y,json.dumps(result_data),qos=2)
+
+
+                    elif "ASYS" in final_label  and int(timetaken)>=5:
+                        mintime = min(datetimee)
+                        maxtime = max(datetimee)
+                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'ASYSTOLE','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                        print("LOG:",result_data)
+                        for i in result_data:
+                            x = mycol.insert_one(dict(i))
+
+                        client.publish(topic_y,json.dumps(result_data),qos=2)
+
+                    elif "Noise" in final_label:
+                        print("VFIB Model Noise")
+                        mintime = min(datetimee)
+                        maxtime = max(datetimee)
+                        try:                               
                             na = np.array(OriginalSignal)
                             rpeaks = detect_beats(na, float(200))
                             beats = []
                             for nnn in rpeaks:
-                                    beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+                                    beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})                                    
                             try:
                                 br,hrv = BPM(rpeaks)
                             except:
                                 br,hrv = 0,[]
-
-                            mintime = min(datetimee)
-                            maxtime = max(datetimee)
-                            maxtimes = datetime.datetime.fromtimestamp(int(maxtime)/1000)
-                            maxtimesnewtime =maxtimes.strftime("%Y-%m-%d %H:%M:%S")
-                            DT2 = parser.parse(maxtimesnewtime)
-                            mintimes = datetime.datetime.fromtimestamp(int(mintime)/1000)
-                            mintimesnewtime = mintimes.strftime("%Y-%m-%d %H:%M:%S")
-                            DT1 = parser.parse(mintimesnewtime)
-                            timetaken = int((DT2 - DT1).total_seconds())
-
-                            try:
-                                HR = int(60*int(len(rpeaks))/(timetaken))
-                                if abs(timetaken)<5:
-                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                    print("LOG:",result_data)
-                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                                else:
-                                    result_data = [{"patient":dd["patient"],"HR":int(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'VFIB','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                    print("LOG:",result_data)
-                                    for i in result_data:
-                                        x = mycol.insert_one(dict(i))
-
-                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                            except Exception as e:
-                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                    print("LOG6:",result_data,e)
-                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-
-
-                    elif final_label == "ASYS" and int(timetaken)>=5:
-                            mintime = min(datetimee)
-                            maxtime = max(datetimee)
-                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'ASYSTOLE','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                            print("LOG:",result_data)
-                            for i in result_data:
-                                x = mycol.insert_one(dict(i))
-
-                            client.publish(topic_y,json.dumps(result_data),qos=2)
-
-                    elif final_label == "Noise":
-                            print("VFIB Model Noise")
-                            mintime = min(datetimee)
-                            maxtime = max(datetimee)
-                            try:                               
-                                na = np.array(OriginalSignal)
-                                rpeaks = detect_beats(na, float(200))
-                                beats = []
-                                for nnn in rpeaks:
-                                        beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})                                    
-                                try:
-                                    br,hrv = BPM(rpeaks)
-                                except:
-                                    br,hrv = 0,[]
-                                HR = int(60*int(len(rpeaks))/(timetaken))
-                                if HR>60 and HR<100:
-                                    if int(version) == 5:
-                                        label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
-                                        print(label_rlbbb)
-                                        if label_rlbbb=="LBBB":
-                                            result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
-                                        elif label_rlbbb=="RBBB":
-                                            result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
-                                        else:
-                                            result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
-
+                            HR = int(60*int(len(rpeaks))/(timetaken))
+                            if HR>60 and HR<100:
+                                if int(version) == 5:
+                                    label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
+                                    print(label_rlbbb)
+                                    if label_rlbbb=="LBBB":
+                                        result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                        print("LOG:",result_data)
+                                        client.publish(topic_y,json.dumps(result_data),qos=2)
+                                    elif label_rlbbb=="RBBB":
+                                        result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                        print("LOG:",result_data)
+                                        client.publish(topic_y,json.dumps(result_data),qos=2)
                                     else:
                                         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                         print("LOG:",result_data)
                                         client.publish(topic_y,json.dumps(result_data),qos=2)
-
                                 else:
-                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"nibp":BloodPressure_check,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                     print("LOG:",result_data)
                                     client.publish(topic_y,json.dumps(result_data),qos=2)
-                                    
-
-                            except Exception as e:
-                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                print("LOG7:",result_data,e)
+                            else:
+                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                print("LOG:",result_data)
                                 client.publish(topic_y,json.dumps(result_data),qos=2)
+                        except Exception as e:
+                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                            print("LOG7:",result_data,e)
+                            client.publish(topic_y,json.dumps(result_data),qos=2)
                     else:
                         print("IN")
                         try:
@@ -5824,9 +5769,9 @@ def subscribe(client: mqtt_client):
                                     if "PVC-Triplet" in pvc_label: # t_count>=1:
                                         result_data.update({"Arrhythmia":'PVC-Triplet',"Vbeats":observer.count(1),"HR":int(HR),"TRIPLETCOUNT":pvc_counts['PVC-Triplet_counter'],"peakslocation":peaksdefined}) # t_count
                                     if float(HR)>100.0:
-                                        if "PVC-NSVT" in pvc_label and observer.count(1)>12:  #vt_count>=1 and bb.count(1)>12:
+                                        if "PVC-VT" in pvc_label and observer.count(1)>12:  #vt_count>=1 and bb.count(1)>12:
                                             result_data.update({"Arrhythmia":'VT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                        if "PVC-Aivr" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
+                                        if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
                                             result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
                                     if float(HR)>60.0 and float(HR)<=100.0:
