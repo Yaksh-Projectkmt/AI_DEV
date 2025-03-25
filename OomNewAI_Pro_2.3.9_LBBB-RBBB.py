@@ -284,6 +284,8 @@ def check_vfib_vfl_model(ecg_signal):
         if str(ids) == "normal" and float(predictions[3]) > 0.75:
             label = "Normal"
             combine_result.append(label)
+        if len(combine_result) == 0:
+            combine_result.append(label)
     for img_path in glob.glob(f'{folder_path}/*.jpg'):
         os.remove(img_path)
     
@@ -4192,6 +4194,215 @@ class PVCDetection:
         self.date_time = date_time
         self.patientid = patientid
 
+    # def pvc_count_finds(self, bb, HR):
+    #     # Bigem
+    #     bigem = []
+    #     bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count  = 0, 0, 0, 0, 0, 0, 0, 0
+    #     for q,k in enumerate(bb):
+    #         if len(bigem) == 3:
+    #             bigem_count+=1
+    #             try:
+    #                 if bb[q] ==0 and bb[q+1]==1:
+    #                     bigem.clear()
+    #                     bigem.append(1)
+    #                 else:
+    #                     bigem.clear()
+    #             except:
+    #                 bigem.clear()
+    #         if len(bigem ) ==0 and k ==1:
+    #             bigem.append(1)
+    #         elif len(bigem) ==1 and k ==0:
+
+    #             bigem.append(0)
+    #         elif len(bigem) ==2 and k ==1:
+    #             bigem.append(1)
+    #         else:
+    #             if len(bigem)==1 and (1 in bigem) and k==1:
+    #                 bigem.clear()
+    #                 bigem.append(1)
+    #             elif len(bigem)>1: 
+    #                 bigem.clear()
+    #                 if k ==1:
+    #                     bigem.append(1)                                                    
+    #     if len(bigem) == 3:
+    #         bigem_count+=1
+    #         bigem.clear()
+
+    #     # Trigeminy 
+    #     Trigem = []
+    #     Trigem_count = 0
+    #     for m,l in enumerate(bb):
+    #         if len(Trigem) == 4:
+    #             Trigem_count+=1
+    #             try:
+    #                 if bb[m] ==0 and bb[m+1]==0 and bb[m+2]==1:
+    #                     Trigem.clear()
+    #                     Trigem.append(1)
+    #                 else:
+    #                     Trigem.clear()
+    #             except:
+    #                 Trigem.clear()
+
+    #         if len(Trigem) ==0 and l ==1:
+    #             Trigem.append(1)
+    #         elif len(Trigem) ==1 and l ==0:
+    #             Trigem.append(0)
+    #         elif len(Trigem) ==2 and l ==0:
+    #             Trigem.append(0)
+    #         elif len(Trigem) ==3 and l ==1:
+    #             Trigem.append(1)
+    #         else:
+    #             if len(Trigem)==1 and (1 in Trigem) and l==1:
+    #                 Trigem.clear()
+    #                 Trigem.append(1)
+    #             elif len(Trigem)>1: 
+    #                 Trigem.clear()
+    #                 if l ==1:
+    #                     Trigem.append(1)
+    #     if len(Trigem) == 4:
+    #         Trigem_count+=1
+    #         Trigem.clear()
+
+    #     # Quadrageminy
+    #     Quadgem = []
+    #     Quadgem_count = 0
+    #     for p,o in enumerate(bb):
+    #         if len(Quadgem) == 5:
+    #             Quadgem_count+=1
+    #             try:
+    #                 if bb[p] ==0 and bb[p+1]==0 and bb[p+2]==0 and bb[p+3]==1:
+    #                     Quadgem.clear()
+    #                     Quadgem.append(1)
+    #                 else:
+    #                     Quadgem.clear()
+    #             except:
+    #                 Quadgem.clear()
+    #         if len(Quadgem) ==0 and o ==1:
+    #             Quadgem.append(1)
+    #         elif len(Quadgem) ==1 and o ==0:   
+    #             Quadgem.append(0)
+    #         elif len(Quadgem) ==2 and o ==0:
+    #             Quadgem.append(0)
+    #         elif len(Quadgem) ==3 and o ==0:
+    #             Quadgem.append(0)
+    #         elif len(Quadgem) ==4 and o ==1:
+    #             Quadgem.append(1)
+    #         else:
+    #             if len(Quadgem)==1 and (o in Quadgem) and o==1:
+    #                 Quadgem.clear()
+    #                 Quadgem.append(1)
+    #             elif len(Quadgem)>1: 
+    #                 Quadgem.clear()
+    #                 if o ==1:
+    #                     Quadgem.append(1)
+    #     if len(Quadgem) == 5:
+    #         Quadgem_count+=1
+    #         Quadgem.clear()
+
+    #     ll=bb
+    #     couplet = []
+    #     c_count=0
+    #     for i in ll:
+    #         if i==1:
+    #             couplet.append(1)
+    #             if len(couplet)==3:
+    #                 c_count-=1
+    #                 couplet.clear()
+
+    #             if len(couplet)==2: 
+    #                 c_count+=1
+                    
+    #             if 0 in couplet:
+    #                 if c_count==0:
+    #                     pass
+    #                 else:
+    #                     c_count-=1
+    #                 couplet.clear()
+    #         else:
+    #             couplet.clear()
+
+    #     triplet = []
+    #     t_count=0
+    #     for i in ll:
+    #         if i==1:
+    #             triplet.append(1)
+    #             if len(triplet)>=4:
+    #                 t_count-=1
+    #                 triplet.clear()
+    #             if len(triplet)==3:
+    #                 t_count+=1
+
+    #             if 0 in triplet:
+    #                 if t_count==0:
+    #                     pass
+    #                 else:
+    #                     t_count-=1
+    #                 triplet.clear()
+    #         else:
+    #             triplet.clear()
+
+    #     if int(HR)>100:
+    #         vt = []
+    #         vt_count=0
+    #         for i in ll:
+    #             if i==1:
+    #                 vt.append(1)
+    #                 if len(vt)>=4:
+    #                     vt_count+=1
+    #                     vt.clear()
+    #                 if 0 in vt:
+    #                     if vt_count==0:
+    #                         pass
+    #                     else:
+    #                         vt_count-=1
+    #                     vt.clear()
+    #             else:
+    #                 vt.clear()
+
+    #     if int(HR)>60 and int(HR)<=300:
+    #         aivr = []
+    #         aivr_count=0
+    #         for i in ll:
+    #             if i==1:
+    #                 aivr.append(1)
+    #                 if len(aivr)>=4:
+    #                     aivr_count+=1
+    #                     aivr.clear()
+    #                 if 0 in aivr:
+    #                     if aivr_count==0:
+    #                         pass
+    #                     else:
+    #                         aivr_count-=1
+    #                     aivr.clear()     
+    #             else:
+    #                 aivr.clear()
+    #     if int(HR)<=60:
+    #         ivr = []
+    #         ivr_count=0
+    #         for i in ll:
+    #             if i==1:
+    #                 ivr.append(1)
+    #                 if len(ivr)>=4:
+    #                     ivr_count+=1
+    #                     ivr.clear()
+    #                 if 0 in ivr:
+    #                     if ivr_count==0:
+    #                         pass
+    #                     else:
+    #                         ivr_count-=1
+    #                     ivr.clear()
+    #             else:
+    #                 ivr.clear()
+    #     total_one = (1*vt_count) + (c_count*2)+ (t_count*3)+ (bigem_count*2)+ (Trigem_count*2)+ (Quadgem_count*2)
+    #     total = bigem_count+ Trigem_count+ Quadgem_count+ c_count+ t_count+ vt_count+ aivr_count+ ivr_count
+    #     ones = bb.count(1)
+    #     if total == 0:
+    #         Isolated = ones
+    #     else:
+    #         Common = total-1
+    #         Isolated = ones-(total_one-Common)
+    #     return  bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count, Isolated
+
     def pvc_count_finds(self, sequence, HR):
         triplet_pattern = [1, 1, 1]
         couplet_pattern = [1, 1]
@@ -4407,7 +4618,7 @@ class PVCDetection:
                         else:
                             RBBB_list.append(0)
 
-                    bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count, Isolated= self.pvc_count_finds(observer, hr)
+                    counts_result = self.pvc_count_finds(observer, hr)
                     r_index_plot = [rpeaks[i] for i in range(len(observer)) if observer[i] == 1]
                     lbbb_index = [rpeaks[i] for i in range(len(LBBB_list)) if LBBB_list[i] == 1]
                     rbbb_index = [rpeaks[i] for i in range(len(RBBB_list)) if RBBB_list[i] == 1]
