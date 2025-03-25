@@ -131,7 +131,7 @@ folder_path = os.path.join("rawdata/", random_folder_name)
 os.makedirs(folder_path)
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_48_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_49_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -4431,19 +4431,19 @@ class PVCDetection:
                 while i < len(sequence) and sequence[i] == 1:
                     i += 1
                 length = i - start
-                if length == 4 and int(HR)<=60:
+                if length == 4 and int(HR)<=100:
                     ivr_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
-                elif length >= 4 and (int(HR)>60 and int(HR)<=300):
-                    aivr_count += 1
-                    for j in range(start, i):
-                        beat_indices.add(j)
-                elif 5 <= length <= 9 and (int(HR)>60 and int(HR)<=300):
+                elif 5 <= length <= 12 and (int(HR)>60 and int(HR)<=300):
                     nsvt_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
-                elif length >= 10 and int(HR)>100:
+#                elif length >= 4 and (int(HR)>60 and int(HR)<=100):
+#                    aivr_count += 1
+#                    for j in range(start, i):
+#                      beat_indices.add(j)
+                elif length >= 13 and int(HR)>100:
                     vt_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
@@ -5966,6 +5966,7 @@ def subscribe(client: mqtt_client):
                                 
                                 # finaliso = actaulPVC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - c_count*2 - t_count*3
                                 if pvc_label:
+                                    
                                     if 'PVC-Isolated' in pvc_label: #actaulPVC.count(1)>0:
                                         result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":observer.count(1),"HR":int(HR),"ISOLATEDCOUNT":observer.count(1),"peakslocation":peaksdefined})
                                         
@@ -5985,11 +5986,11 @@ def subscribe(client: mqtt_client):
                                         if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
                                             result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
-                                    if float(HR)>60.0 and float(HR)<=100.0:
-                                        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
-                                            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+#                                    if float(HR)>60.0 and float(HR)<=100.0:
+#                                        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
+#                                            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
                                     
-                                    if float(HR)<=60.0:
+                                    if float(HR)<=100.0:
                                         if "PVC-Ivr" in pvc_label: #ivr_count>=1:
                                             result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
