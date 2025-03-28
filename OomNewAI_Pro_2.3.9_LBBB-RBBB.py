@@ -146,9 +146,9 @@ output_details_noise = interpreter_noise.get_output_details()
 
 with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
-    vfib_vfl_model = load_tflite_model("vfib_trans_mob_3.tflite")
-    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_27.tflite")
-    block_load_model = load_tflite_model("Block_Trans_mob_14_super_new.tflite")
+    vfib_vfl_model = load_tflite_model("vfib_trans_mob_5_enhanced.tflite")
+    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_31.tflite")
+    block_load_model = load_tflite_model("Block_Trans_mob_16_super_new.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
     
 def prediction_model_PAC(input_arr, target_shape=[224, 224], class_name=True):
@@ -301,13 +301,21 @@ def check_vfib_vfl_model(ecg_signal):
         label = temp_label[0]
     return label
 
-def Vfib_asys_detection(all_leads_data):
+def Vfib_asys_detection(all_leads_data, is_lead=2):
     vifib_asys_result = 'Abnormal'
     all_lead_det_data = {}
     vifib_results = []
+    if is_lead == 8:
+        analysis_leads = ['I','II', 'III', 'v1', 'v5']
+        rep_thresh = 2
+    elif is_lead == 5:
+        analysis_leads = ['I','II', 'III']
+        rep_thresh = 1
+    else:
+        analysis_leads = ['II']
     for lead in all_leads_data.keys():
         lead_data = {}
-        if lead in [ 'I','II', 'III']:
+        if lead in analysis_leads:
             ecg_signal = all_leads_data[lead].values
             # baseline_signal = baseline_construction_200(ecg_signal)
             # lowpass_signal = lowpass(baseline_signal)
@@ -323,7 +331,7 @@ def Vfib_asys_detection(all_leads_data):
             else:
                 flat_list.append(element)
         counts = Counter(flat_list)
-        repeated_elements = [item for item, count in counts.items() if count > 1 and item != 'Abnormal']
+        repeated_elements = [item for item, count in counts.items() if count > rep_thresh and item != 'Abnormal']
         vfib_vfl_lab = ' '.join(repeated_elements)
         if vfib_vfl_lab:
             vifib_asys_result = vfib_vfl_lab
@@ -652,7 +660,7 @@ def noise_engine(all_leads_data, version):
     if version == 2:
         if noise_result_dic['II'] == 'high_noise':
             noise_label = 'high_noise'
-    elif version == 5:
+    elif version == 5 or version == 8:
         if noise_result_dic['I'] == 'high_noise' and noise_result_dic['II'] == 'high_noise':
             noise_label = 'high_noise'
         elif noise_result_dic['I'] == 'high_noise' or noise_result_dic['v5'] == 'high_noise':
@@ -3525,7 +3533,7 @@ class afib_flutter_detection:
         last_s = None
         last_q = None
         check_2nd_lead = {}
-        afib_data_index = []
+        afib_data_index, flutter_data_index = [], []
         if len(self.q_index) > 4 and len(self.s_index) > 4:
             q_new  = self.q_index[:-4:4].tolist()
             s_new = self.s_index[4::4].tolist()
@@ -3959,20 +3967,36 @@ def check_mi_model(all_leads_data, imageresource):
         mi_result = "T_wave_Abnormality"
     return mi_result
 
-def data_convert_MI(sorted_data): # patient_id, path=None
+def data_convert_MI(sorted_data, version): # patient_id, path=None
     A = pd.DataFrame(sorted_data)[['dateTime', 'data']]
     try:
         tog_arr = 0
-        temp_A = pd.DataFrame(sorted_data)[['data1', 'data5']]
-        if temp_A['data1'][0]=="": tog_arr = 1
-        A1 = temp_A['data1'].to_list()
-        A5 = temp_A['data5'].to_list()
+        if version == 5:
+            temp_A = pd.DataFrame(sorted_data)[['data1', 'data5']]
+            if temp_A['data1'][0]=="": tog_arr = 1
+            A1 = temp_A['data1'].to_list()
+            A5 = temp_A['data5'].to_list()
+        elif version == 8:
+            temp_A = pd.DataFrame(sorted_data)[['data1', 'data5', 'vOne', 'vTwo', 'vThree', 'vFour', 'vSix']]
+            if temp_A['data1'][0]=="": tog_arr = 1
+            A1 = temp_A['data1'].to_list()
+            A5 = temp_A['data5'].to_list()
+            v1 = A['vOne'].to_list()
+            v2 = A['vTwo'].to_list()
+            v3 = A['vThree'].to_list()
+            v4 = A['vFour'].to_list()
+            v6 = A['vSix'].to_list()
+        else: 
+            tog_arr = 1
     except Exception as e:
         tog_arr = 1
     A2 = A['data'].to_list()
     
     l, l1, l5 = [], [], []
-    data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[],"v5":[]} # "DateTime":[],
+    if version == 5:
+        data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[],"v5":[]} # "DateTime":[],
+    elif version == 8:
+        data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[], "v1":[], "v2":[], "v3":[], "v4":[], "v5":[], "v6":[]}
     if tog_arr == 0:
         for i in range(len(A2)):
             # d = A["dateTime"][i]
@@ -3981,58 +4005,162 @@ def data_convert_MI(sorted_data): # patient_id, path=None
             start = 0
             stop = 4
             kk= 0
-            while True:
-                l = A2[i][start:stop]
-                l1 = A1[i][start:stop]
-                l5 = A5[i][start:stop]
-                
-                high = l[2]+l[3]
-                low = l[0]+ l[1]
-                high1 = l1[2]+l1[3]
-                low1 = l1[0]+ l1[1]
-                high5 = l5[2]+l5[3]
-                low5 = l5[0]+ l5[1]
+            if version == 5:
+                while True:
+                    l = A2[i][start:stop]
+                    l1 = A1[i][start:stop]
+                    l5 = A5[i][start:stop]
+                    
+                    high = l[2]+l[3]
+                    low = l[0]+ l[1]
+                    high1 = l1[2]+l1[3]
+                    low1 = l1[0]+ l1[1]
+                    high5 = l5[2]+l5[3]
+                    low5 = l5[0]+ l5[1]
 
-                highdec = int(str(high), 16) # 18
-                lowdec = int(str(low),16)
-                val = (int(highdec)*256)+(int(lowdec))
-                val = ((val + 32768) % 65536) - 32768
-                voltage2 = (4.6/4095)*val/4
-                
-                highdec1 = int(str(high1), 16)
-                lowdec1 = int(str(low1),16)
-                val1 = (int(highdec1)*256)+(int(lowdec1))
-                val1 = ((val1 + 32768) % 65536) - 32768
-                voltage1 = (4.6/4095)*val1/4
-                
-                highdec5 = int(str(high5), 16)
-                lowdec5 = int(str(low5),16)
-                val5 = (int(highdec5)*256)+(int(lowdec5))
-                val5 = ((val5 + 32768) % 65536) - 32768
-                voltage5 = (4.6/4095)*val5/4
-                
-                voltage3 = voltage2 - voltage1
-                
-                aVR = -(voltage1 + voltage2)  / 2
+                    highdec = int(str(high), 16) # 18
+                    lowdec = int(str(low),16)
+                    val = (int(highdec)*256)+(int(lowdec))
+                    val = ((val + 32768) % 65536) - 32768
+                    voltage2 = (4.6/4095)*val/4
+                    
+                    highdec1 = int(str(high1), 16)
+                    lowdec1 = int(str(low1),16)
+                    val1 = (int(highdec1)*256)+(int(lowdec1))
+                    val1 = ((val1 + 32768) % 65536) - 32768
+                    voltage1 = (4.6/4095)*val1/4
+                    
+                    highdec5 = int(str(high5), 16)
+                    lowdec5 = int(str(low5),16)
+                    val5 = (int(highdec5)*256)+(int(lowdec5))
+                    val5 = ((val5 + 32768) % 65536) - 32768
+                    voltage5 = (4.6/4095)*val5/4
+                    
+                    voltage3 = voltage2 - voltage1
+                    
+                    aVR = -(voltage1 + voltage2)  / 2
 
-                aVL = (voltage1 - voltage3) / 2
+                    aVL = (voltage1 - voltage3) / 2
 
-                aVF = (voltage2 - voltage3)/ 2
-                
-                data_dict["I"].append(voltage1)
-                data_dict["II"].append(voltage2)
-                data_dict["III"].append(voltage3)
-                data_dict["aVR"].append(aVR)
-                data_dict["aVL"].append(aVL)
-                data_dict["aVF"].append(aVF)
-                data_dict["v5"].append(voltage5)
-                
-                # data_dict["DateTime"].append(d)
-                start+=4
-                stop+=4
-                kk+=1
-                if stop> len(A2[i]):
-                    break
+                    aVF = (voltage2 - voltage3)/ 2
+                    
+                    data_dict["I"].append(voltage1)
+                    data_dict["II"].append(voltage2)
+                    data_dict["III"].append(voltage3)
+                    data_dict["aVR"].append(aVR)
+                    data_dict["aVL"].append(aVL)
+                    data_dict["aVF"].append(aVF)
+                    data_dict["v5"].append(voltage5)
+                    
+                    # data_dict["DateTime"].append(d)
+                    start+=4
+                    stop+=4
+                    kk+=1
+                    if stop> len(A2[i]):
+                        break
+            elif self.lead_12:
+                while True:
+                    l = A2[i][start:stop]
+                    l1 = A1[i][start:stop]
+                    l5 = A5[i][start:stop]
+                    lv1 = v1[i][start:stop]
+                    lv2 = v2[i][start:stop]
+                    lv3 = v3[i][start:stop]
+                    lv4 = v4[i][start:stop]
+                    lv6 = v6[i][start:stop]
+                    
+                    high = l[2]+l[3]
+                    low = l[0]+ l[1]
+                    high1 = l1[2]+l1[3]
+                    low1 = l1[0]+ l1[1]
+                    high5 = l5[2]+l5[3]
+                    low5 = l5[0]+ l5[1]
+                    v1_high = lv1[2]+lv1[3]
+                    v1_low = lv1[0]+ lv1[1]
+                    v2_high = lv2[2]+lv2[3]
+                    v2_low = lv2[0]+ lv2[1]
+                    v3_high = lv3[2]+lv3[3]
+                    v3_low = lv3[0]+ lv3[1]
+                    v4_high = lv4[2]+lv4[3]
+                    v4_low = lv4[0]+ lv4[1]
+                    v6_high = lv6[2]+lv6[3]
+                    v6_low = lv6[0]+ lv6[1]
+
+                    highdec = int(str(high), 16) # 18
+                    lowdec = int(str(low),16)
+                    val = (int(highdec)*256)+(int(lowdec)) # val = (float(highdec)*256)+(float(lowdec))
+                    val = ((val + 32768) % 65536) - 32768
+                    voltage2 = (4.6/4095)*val/4
+                    
+                    highdec1 = int(str(high1), 16)
+                    lowdec1 = int(str(low1),16)
+                    val1 = (int(highdec1)*256)+(int(lowdec1))
+                    val1 = ((val1 + 32768) % 65536) - 32768
+                    voltage1 = (4.6/4095)*val1/4
+                    
+                    highdec5 = int(str(high5), 16)
+                    lowdec5 = int(str(low5),16)
+                    val5 = (int(highdec5)*256)+(int(lowdec5))
+                    val5 = ((val5 + 32768) % 65536) - 32768
+                    voltage5 = (4.6/4095)*val5/4
+
+                    high_temp_v1 = int(str(v1_high), 16)
+                    low_temp_v1 = int(str(v1_low),16)
+                    vol_v1 = (int(high_temp_v1)*256)+(int(low_temp_v1))
+                    vol_v1 = ((vol_v1 + 32768) % 65536) - 32768
+                    v1_voltage = (4.6/4095)*vol_v1/4
+
+                    high_temp_v2 = int(str(v2_high), 16)
+                    low_temp_v2 = int(str(v2_low),16)
+                    vol_v2 = (int(high_temp_v2)*256)+(int(low_temp_v2))
+                    vol_v2 = ((vol_v2 + 32768) % 65536) - 32768
+                    v2_voltage = (4.6/4095)*vol_v2/4
+
+                    high_temp_v3 = int(str(v3_high), 16)
+                    low_temp_v3 = int(str(v3_low),16)
+                    vol_v3 = (int(high_temp_v3)*256)+(int(low_temp_v3))
+                    vol_v3 = ((vol_v3 + 32768) % 65536) - 32768
+                    v3_voltage = (4.6/4095)*vol_v3/4
+
+                    high_temp_v4 = int(str(v4_high), 16)
+                    low_temp_v4 = int(str(v4_low),16)
+                    vol_v4 = (int(high_temp_v4)*256)+(int(low_temp_v4))
+                    vol_v4 = ((vol_v4 + 32768) % 65536) - 32768
+                    v4_voltage = (4.6/4095)*vol_v4/4
+
+                    high_temp_v6 = int(str(v6_high), 16)
+                    low_temp_v6 = int(str(v6_low),16)
+                    vol_v6 = (int(high_temp_v6)*256)+(int(low_temp_v6))
+                    vol_v6 = ((vol_v6 + 32768) % 65536) - 32768
+                    v6_voltage = (4.6/4095)*vol_v6/4
+                    
+                    voltage3 = voltage2 - voltage1
+                    
+                    aVR = -(voltage1 + voltage2)  / 2
+
+                    aVL = (voltage1 - voltage3) / 2
+
+                    aVF = (voltage2 - voltage3)/ 2
+                    
+                    data_dict["I"].append(voltage1)
+                    data_dict["II"].append(voltage2)
+                    data_dict["III"].append(voltage3)
+                    data_dict["aVR"].append(aVR)
+                    data_dict["aVL"].append(aVL)
+                    data_dict["aVF"].append(aVF)
+                    data_dict["v1"].append(v1_voltage)
+                    data_dict["v2"].append(v2_voltage)
+                    data_dict["v3"].append(v3_voltage)
+                    data_dict["v4"].append(v4_voltage)
+                    data_dict["v5"].append(voltage5)
+                    data_dict["v6"].append(v6_voltage)
+                    
+                    data_dict["DateTime"].append(d)
+                    start+=4
+                    stop+=4
+                    kk+=1
+                    if stop> len(A2[i]):
+                        break
 
     df = {}
     if tog_arr == 0:
@@ -4046,6 +4174,9 @@ def data_convert_MI(sorted_data): # patient_id, path=None
         return df
 
     return df
+
+
+
 
 def rrirrAB(rpeaks):
     rpeak_diff = np.diff(rpeaks)
@@ -4533,9 +4664,16 @@ class PVCDetection:
         temp_uuid = str(uuid.uuid1())
         imageresource_pvc = os.path.join("temp_pvc_img/", temp_uuid)
         os.makedirs(imageresource_pvc)
+        
         if len(all_lead_data) != 0:
+            if self.is_lead == 8:
+                analysis_leads = ['I','II','III', 'v1', 'v5']
+            elif self.is_lead == 5:
+                analysis_leads = ['I','II','III']
+            else:
+                analysis_leads = ['II']
             for lead in all_lead_data.keys():
-                if lead in ['I','II','III']: #['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']:
+                if lead in analysis_leads: #['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']:
                     lead_data = {}
                     ecg_signal = all_lead_data[lead]
                     lis= []
@@ -4638,10 +4776,11 @@ class PVCDetection:
                     pvc_label = '; '.join([key.split('_')[0] for key, val in pvc_label_counts.items() if 'counter' in key and val > 0])
                     if len(pvc_label) == 0:
                         pvc_label = 'Normal'
-                    if len(lbbb_index)/ len(rpeaks)> 0.3:
-                        lbbb_rbbb_label = "LBBB"
-                    if len(rbbb_index)/ len(rpeaks) > 0.3:
-                        lbbb_rbbb_label = "RBBB"
+                    if rpeaks:
+                      if len(lbbb_index)/ len(rpeaks)> 0.3:
+                          lbbb_rbbb_label = "LBBB"
+                      if len(rbbb_index)/ len(rpeaks) > 0.3:
+                          lbbb_rbbb_label = "RBBB"
                     lead_data['pvc_index'] = pvc_label_counts['pvc_r_index']
                     lead_data['pvc_label'] = pvc_label
                     lead_data['lbbb_rbbb_label'] = lbbb_rbbb_label
@@ -4662,7 +4801,10 @@ class PVCDetection:
                         combined_labels.append(data['pvc_label'])
                     combined_labels.append(data['lbbb_rbbb_label'])
                 label_counts = Counter(combined_labels)
-                repeated_elements = [item for item, count in label_counts.items() if count > 1]
+                if self.is_lead == 8:
+                    repeated_elements = [item for item, count in label_counts.items() if count > 2]
+                else:
+                    repeated_elements = [item for item, count in label_counts.items() if count > 1]
                 
                 if 'NSVT' in label_counts and label_counts['NSVT'] != 3:
                     repeated_elements.remove('PVC-NSVT')
@@ -4728,8 +4870,15 @@ class PACDetection:
         print("----------------------- PAC detection -----------------------------")
         all_lead_pac_data, results_pac = {}, {}
         all_lead_data = self.get_signal
+        if self.is_lead == 8:
+            analysis_leads = ['I','II','III', 'v1', 'v5']
+        elif self.is_lead == 5:
+            analysis_leads = ['I','II','III']
+        else:
+            analysis_leads = ['II']
+
         for lead in all_lead_data.keys():
-            if lead in ['I', 'II', 'III']: #['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']:
+            if lead in analysis_leads: 
                 lead_data = {}
                 ecg_signal = all_lead_data[lead]
                 pac_label, junctional_label = 'Abnormal', 'Abnormal'
@@ -4835,16 +4984,20 @@ class PACDetection:
                         combined_labels.append(data['pac_label'])
                     combined_labels.append(data['junctional_label'])
                 label_counts = Counter(combined_labels)
-                repeated_elements = [item for item, count in label_counts.items() if count > 1]
+                if self.is_lead == 8:
+                    rep_thresh = 2
+                else:
+                    rep_thresh = 1
+                repeated_elements = [item for item, count in label_counts.items() if count > rep_thresh]
                 
                 if 'SVT' in label_counts and label_counts['SVT'] != 3:
                     repeated_elements.remove('PAC-SVT')
                 
-                if 'Junctional_Rhythm' in label_counts and label_counts['Junctional_Rhythm'] > 1:
+                if 'Junctional_Rhythm' in label_counts and label_counts['Junctional_Rhythm'] > rep_thresh:
                     jnc_label = 'Junctional_Rhythm'
                     if 'Junctional_Rhythm' in repeated_elements:
                         repeated_elements.remove('Junctional_Rhythm')
-                elif 'Junctional_Bradycardia' in label_counts and label_counts['Junctional_Bradycardia'] > 1:
+                elif 'Junctional_Bradycardia' in label_counts and label_counts['Junctional_Bradycardia'] > rep_thresh:
                     jnc_label = 'Junctional_Bradycardia'
                     if 'Junctional_Bradycardia' in repeated_elements:
                         repeated_elements.remove('Junctional_Bradycardia')
@@ -5180,19 +5333,26 @@ def block_model_check(ecg_signal, frequency, abs_result, block_model):
             ei_ti_block.append({"Arrhythmia":"III Degree","percentage":model_pre[2]*100})
     return model_label, ei_ti_block
 
-def block_detection_processing(all_lead_data, fs=200):
+def block_detection_processing(all_lead_data, is_lead=2,  fs=200):
     print("----------------- block_detection_processing -------------------")
     block_label, ei_ti_label = 'Abnormal', 'Abnormal'
        
     all_lead_result_data= {}
     all_block_labels, all_ei_ti_laels = [], []
-    
+    if is_lead == 5:
+        analysis_lead = ['I', 'II', 'III']
+        rep_thresh = 2
+    elif is_lead == 8:
+        analysis_lead = ['I', 'II', 'III', 'v1', 'v5']
+        rep_thresh = 1
+    else:
+        analysis_lead = ['I']
     if len(all_lead_data) != 0:
         for lead in all_lead_data.keys():
             lead_data = {}
             
             model_label = 'Abnormal'
-            if lead in ['I', 'II', 'III']:
+            if lead in analysis_lead:
                 ecg_signal = all_lead_data[lead]
                 frequency = 200
                 baseline_signal = baseline_construction_200(ecg_signal, 101)
@@ -5218,12 +5378,12 @@ def block_detection_processing(all_lead_data, fs=200):
             if all_block_labels:
                 labels_result = find_label_couter(all_block_labels)
                 counts = Counter(labels_result)
-                repeated_elements = [item for item, count in counts.items() if count > 1]
+                repeated_elements = [item for item, count in counts.items() if count > rep_thresh]
                 block_label = ' '.join(repeated_elements)
             if all_ei_ti_laels:
                 ei_ti_labels_result = find_label_couter(all_ei_ti_laels)
                 et_count = Counter(ei_ti_labels_result)
-                find_repeated = [item for item, count in et_count.items() if count > 1]
+                find_repeated = [item for item, count in et_count.items() if count > rep_thresh]
                 ei_ti_label = ' '.join(find_repeated)
         else:
             block_label = all_lead_result_data['II']['block_label']
@@ -5399,9 +5559,9 @@ def subscribe(client: mqtt_client):
                 ecgdata = pd.DataFrame({"ECG":OriginalSignal})
                 fs = 200
                 all_lead_data = {}
-                if version == 5:
-                    all_lead_data = data_convert_MI(sorted_data)
-                elif version == 2:
+                if int(version) == 5 or int(version) == 8:
+                    all_lead_data = data_convert_MI(sorted_data, int(version))
+                elif int(version) == 2:
                     all_lead_data = pd.DataFrame({'II': OriginalSignal})
                 final_output = noise_engine(all_lead_data, int(version))
                 mintime = min(datetimee)
@@ -5579,7 +5739,7 @@ def subscribe(client: mqtt_client):
                         
                     # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
                     # final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
-                    final_label = Vfib_asys_detection(all_lead_data)
+                    final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
 
                     BloodPressure_check = BloodPressure(naa)
 
@@ -5689,7 +5849,7 @@ def subscribe(client: mqtt_client):
                             newdada = aboutdata["ECG"]
                             naa = np.array(newdada)
                             
-                            # 2, 7 lead according r peak detection
+                            # 2, 7, 12 lead according r peak detection
                             rpeaks = check_r_index(all_lead_data, fs, int(version))
                             s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
                             rrint=''
@@ -6091,7 +6251,7 @@ def subscribe(client: mqtt_client):
                                     # block_na = lowpass_11(naa)
                                     # labelss = block_process(block_na, 200
                                     # final_label,ei_ti_block = block_model_check(block_na, 200, labelss)
-                                    block_results = block_detection_processing(all_lead_data, fs=fs)
+                                    block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
                                     final_label = block_results['block_label']
                                     ei_ti_block = block_results['ei_ti_label']
                                     if final_label == "III Degree": 
@@ -6194,7 +6354,7 @@ def subscribe(client: mqtt_client):
                                     print('check')
                                     label_rlbbb = LBBB_RBBB(b_es,rpeaks,imageresource)
 
-                                    all_lead_data = data_convert_MI(sorted_data) #, path=save, patient_id
+                                    all_lead_data = data_convert_MI(sorted_data, int(version)) #, path=save, patient_id
                                     if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
                                         label_mi = check_mi_model(all_lead_data, imageresource)
                                         if label_rlbbb == "LBBB":
