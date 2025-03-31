@@ -205,7 +205,7 @@ os.makedirs(folder_path)
 
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_46_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_52_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -221,9 +221,9 @@ output_details_noise = interpreter_noise.get_output_details()
 
 with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
-    vfib_vfl_model = load_tflite_model("vfib_trans_mob_1.tflite")
-    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_27.tflite")
-    block_load_model = load_tflite_model("Block_Trans_mob_2.tflite")
+    vfib_vfl_model = load_tflite_model("vfib_trans_mob_5_enhanced.tflite")
+    pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_31.tflite")
+    block_load_model = load_tflite_model("Block_Trans_mob_16_super_new.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
 
 def prediction_model_PAC(input_arr, target_shape=[224, 224], class_name=True):
@@ -282,112 +282,6 @@ def prediction_model(image_path, target_shape=[224, 224], class_name=True):
         return output_data[0], classes[idx]
     else:
         return output_data[0]
-
-
-# def resampled_ecg_data(ecg_signal, original_freq, desire_freq):
-#     original_time = np.arange(len(ecg_signal)) / original_freq
-#     new_time = np.linspace(original_time[0], original_time[-1], int(len(ecg_signal) * (desire_freq/original_freq)))
-#     interp_func = interp1d(original_time, ecg_signal, kind='linear')
-#     scaled_ecg_data = interp_func(new_time)
-#     return scaled_ecg_data
-
-# def image_array_news_vfib(signal):
-#     scales = np.arange(1, 50, 1)
-#     coef, freqs = pywt.cwt(signal, scales, 'mexh')
-#     abs_coef = np.abs(coef)
-#     y_scale = abs_coef.shape[0] / 224
-#     x_scale = abs_coef.shape[1] / 224
-#     x_indices = np.arange(224) * x_scale
-#     y_indices = np.arange(224) * y_scale
-#     x, y = np.meshgrid(x_indices, y_indices, indexing='ij')
-#     x = x.astype(int)
-#     y = y.astype(int)
-#     rescaled_coef = abs_coef[y, x]
-#     min_val = np.min(rescaled_coef)
-#     max_val = np.max(rescaled_coef)
-#     normalized_coef = (rescaled_coef - min_val) / (max_val - min_val)
-#     cmap_indices = (normalized_coef * 256).astype(np.uint8)
-#     cmap = colormaps.get_cmap('viridis')
-#     rgb_values = cmap(cmap_indices)
-#     image = rgb_values.reshape((224, 224, 4))[:, :, :3]
-#     denormalized_image = (image * 254) + 1
-#     rotated_image = np.rot90(denormalized_image, k=1, axes=(1, 0))
-#     return rotated_image.astype(np.uint8)
-
-# def vfib_model_pred_tfite(raw_signal, model, fs):
-# ##    if fs == 200 and (np.max(raw_signal) > 4.1 or np.min(raw_signal) < 0):
-#     raw_signal = MinMaxScaler(feature_range=(0,4)).fit_transform(raw_signal.reshape(-1,1)).squeeze()
-#     seconds = 2.5
-#     steps_data = int(fs*seconds)
-#     total_data = raw_signal.shape[0]
-#     start = 0
-#     normal, vfib_vflutter, asys, noise = [], [], [], []
-#     percentage = {'NORMAL':0, 'VFIB-VFLUTTER':0, 'ASYS':0, 'NOISE':0}
-#     model_prediction = []
-#     while start < total_data:
-#         end = start+steps_data
-#         if end - start == steps_data and end < total_data:
-#             _raw_s_ = raw_signal[start:end]
-#             if _raw_s_.any() :
-#                 raw = image_array_news_vfib(_raw_s_)
-#             else:
-#                 raw = np.array([])
-#         else:
-#             _raw_s_ = raw_signal[start:end]
-#             if _raw_s_.any():
-#                 _raw_s_ = raw_signal[-steps_data:total_data]
-#                 raw = image_array_news_vfib(_raw_s_)
-#                 end = total_data - 1
-#             else:
-#                 raw = np.array([])
-#         if raw.any():
-#             raw = raw.astype(np.float32)/255
-#             rs_raw = resampled_ecg_data(_raw_s_, fs, 500/seconds)
-#             if rs_raw.shape[0] != 500:
-#                 rs_raw = signal.resample(rs_raw, 500)
-# ##            image_data = (tf.expand_dims(raw, axis=0), tf.constant(rs_raw.reshape(1, -1, 1).astype(np.float32)))
-#             # image_data = (tf.cast(image_data[0],dtype=tf.float32), )
-#             image_data = (tf.expand_dims(raw, axis=0),)
-#             model_pred = predict_tflite_model(model, image_data)[0]
-#             label = np.argmax(model_pred)
-#             model_prediction.append(f'{(start, end)}={model_pred}')
-#             if label == 0: normal.append(((start, end), model_pred)); percentage['NORMAL'] += (end-start)/total_data
-#             elif label == 1: vfib_vflutter.append(((start, end), model_pred)); percentage['VFIB-VFLUTTER'] += (end-start)/total_data
-#             elif label == 2: asys.append(((start, end), model_pred)); percentage['ASYS'] += (end-start)/total_data
-#             else: noise.append(((start, end), model_pred)); percentage['NOISE'] += (end-start)/total_data
-#         start = start+steps_data
-    
-#     return normal, vfib_vflutter, asys, noise, model_prediction, percentage
-
-# ##@time_wrapper
-# def vfib_model_check_new(ecg_signal, model, fs):
-#     normal, vfib_vflutter, asys, noise, model_prediction, percentage = vfib_model_pred_tfite(ecg_signal, model, fs)
-    
-#     final_label_index = np.argmax([percentage['NORMAL'], percentage['VFIB-VFLUTTER'],
-#                              percentage['ASYS'], percentage['NOISE']])
-    
-#     if final_label_index == 0 and percentage['NORMAL'] > .50:
-#         final_label = 'Normal'
-#         percentage = percentage['NORMAL']
-
-#     elif final_label_index == 0 and (percentage['VFIB-VFLUTTER'] < 0.3 and percentage['ASYS'] < 0.3 and percentage['NOISE'] < 0.3):
-#         final_label = 'Normal'
-#         percentage = percentage['NORMAL']
-
-#     else:
-#         final_label_index = np.argmax([percentage['VFIB-VFLUTTER'],
-#                                 percentage['ASYS'], percentage['NOISE']])
-#         if final_label_index == 0:
-#             final_label = 'VFIB/Vflutter'
-#             percentage = percentage['VFIB-VFLUTTER']
-#         elif final_label_index == 1:
-#             final_label = 'ASYS'
-#             percentage = percentage['ASYS']
-#         else:
-#             final_label = 'Noise'
-#             percentage = percentage['NOISE']
-        
-#     return final_label, percentage, (normal, vfib_vflutter, asys, noise, model_prediction)
 
 def remove_temp_folder(folder_path):
     def on_rm_error(func, path, exc_info):
@@ -481,6 +375,46 @@ def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
         label = temp_label[0]
     return label
 
+def Vfib_asys_detection(all_leads_data, is_lead=2):
+    vifib_asys_result = 'Abnormal'
+    all_lead_det_data = {}
+    vifib_results = []
+    if is_lead == 8:
+        analysis_leads = ['I','II', 'III', 'v1', 'v5']
+        rep_thresh = 2
+    elif is_lead == 5:
+        analysis_leads = ['I','II', 'III']
+        rep_thresh = 1
+    else:
+        analysis_leads = ['II']
+    for lead in all_leads_data.keys():
+        lead_data = {}
+        if lead in analysis_leads:
+            ecg_signal = all_leads_data[lead].values
+            # baseline_signal = baseline_construction_200(ecg_signal)
+            # lowpass_signal = lowpass(baseline_signal)
+            vi_model_result = check_vfib_vfl_model(ecg_signal)
+            lead_data['vfib_result'] = vi_model_result
+            all_lead_det_data[lead] = lead_data
+            vifib_results.append(vi_model_result)
+    if len(all_lead_det_data.keys()) > 1:
+        flat_list = []
+        for element in vifib_results:
+            if isinstance(element, list):
+                flat_list.extend(element)
+            else:
+                flat_list.append(element)
+        counts = Counter(flat_list)
+        repeated_elements = [item for item, count in counts.items() if count > rep_thresh and item != 'Abnormal']
+        vfib_vfl_lab = ' '.join(repeated_elements)
+        if vfib_vfl_lab:
+            vifib_asys_result = vfib_vfl_lab
+        else:
+            vifib_asys_result = "Abnormal"
+    else:
+        vifib_asys_result =  all_lead_det_data['II']['vfib_result']
+    return vifib_asys_result
+
 def image_array_new(signal):
     scales = np.arange(1, 25, 1)
     coef, freqs = pywt.cwt(signal, scales, 'gaus6')
@@ -520,63 +454,6 @@ def diff(x,y):
                 
     return pac
 
-# def detect_beats(
-#         baseline_signal,  # The raw ECG signal
-#         fs,  # Sampling fs in HZ
-#         # Window size in seconds to use for
-#         ransac_window_size=3.0, #5.0
-#         # Low frequency of the band pass filter
-#         lowfreq=5.0,
-#         # High frequency of the band pass filter
-#         highfreq=10.0,
-# ):
-#     ransac_window_size = int(ransac_window_size * fs)
-
-#     lowpass = scipy.signal.butter(1, highfreq / (fs / 2.0), 'low')
-#     highpass = scipy.signal.butter(1, lowfreq / (fs / 2.0), 'high')
-#     # TODO: Could use an actual bandpass filter
-#     ecg_low = scipy.signal.filtfilt(*lowpass, x=baseline_signal)
-#     ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
-
-#     # Square (=signal power) of the first difference of the signal
-#     decg = np.diff(ecg_band)
-#     decg_power = decg ** 2
-
-#     # Robust threshold and normalizator estimation
-#     thresholds = []
-#     max_powers = []
-#     for i in range(int(len(decg_power) / ransac_window_size)):
-#         sample = slice(i * ransac_window_size, (i + 1) * ransac_window_size)
-#         d = decg_power[sample]
-#         thresholds.append(0.5 * np.std(d))
-#         max_powers.append(np.max(d))
-
-#     threshold = np.median(thresholds)
-#     max_power = np.median(max_powers)
-#     decg_power[decg_power < threshold] = 0
-
-#     decg_power /= max_power
-#     decg_power[decg_power > 1.0] = 1.0
-#     square_decg_power = decg_power ** 4
-#     # square_decg_power = decg_power**4
-
-#     shannon_energy = -square_decg_power * np.log(square_decg_power)
-#     shannon_energy[~np.isfinite(shannon_energy)] = 0.0
-
-#     mean_window_len = int(fs * 0.125 + 1)
-#     lp_energy = np.convolve(shannon_energy, [1.0 / mean_window_len] * mean_window_len, mode='same')
-#     # lp_energy = scipy.signal.filtfilt(*lowpass2, x=shannon_energy)
-
-#     lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs / 14.0) # 20.0
-#     # lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs/8.0)
-#     lp_energy_diff = np.diff(lp_energy)
-
-#     zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
-#     zero_crossings = np.flatnonzero(zero_crossings)
-#     zero_crossings -= 1
-
-#     return zero_crossings
-    
 def detect_beats(ecg, rate, ransac_window_size=3.35, lowfreq=5.0, highfreq=15.0):
     ransac_window_size = int(ransac_window_size * rate)
     lowpass = scipy.signal.butter(1, highfreq / (rate / 2.0), 'low')
@@ -744,12 +621,25 @@ def check_noise_model(ecg_signal, frequency):
             noise_label = 'high_noise'
     return noise_label
 
-def noise_engine(flag,ecgdata):
+def noise_engine(all_leads_data, version):
     noise_label = 'Normal'
-    if flag == "200":
-        ecg_signal = np.array(ecgdata["ECG"])
-        noise_label = check_noise_model(ecg_signal, 200)
-
+    noise_result_dic = {}
+    noise_results = []
+    for lead in all_leads_data.keys():
+        ecg_signal = all_leads_data[lead].values
+        ecg_signal = np.asarray(ecg_signal).ravel()
+        get_noise = check_noise_model(ecg_signal, 200)
+        noise_results.append(get_noise)
+        noise_result_dic[lead] = noise_results
+    noise_cou = noise_results.count('high_noise')
+    if version == 2:
+        if noise_result_dic['II'] == 'high_noise':
+            noise_label = 'high_noise'
+    elif version == 5 or version == 8:
+        if noise_result_dic['I'] == 'high_noise' and noise_result_dic['II'] == 'high_noise':
+            noise_label = 'high_noise'
+        elif noise_result_dic['I'] == 'high_noise' or noise_result_dic['v5'] == 'high_noise':
+            noise_label = 'high_noise'
     return noise_label
 
 def unique(list1):
@@ -1013,12 +903,20 @@ def find_p_t(signal, r_index, q_index, j_index):
             pt.extend([0])
     return pt, p_t
 
+# def hr_count(ecg_signal, r_index, fs=200):
+#     cal_sec = round(ecg_signal.shape[0]/fs)
+#     if cal_sec != 0:
+#         hr = round(r_index.shape[0]*60/cal_sec)
+#         return hr
+#     return 0
+
 def hr_count(ecg_signal, r_index, fs=200):
-    cal_sec = round(ecg_signal.shape[0]/fs)
+    cal_sec = round(len(ecg_signal)/fs)
     if cal_sec != 0:
-        hr = round(r_index.shape[0]*60/cal_sec)
+        hr = round(len(r_index)*60/cal_sec)
         return hr
     return 0
+
 
 def fir_lowpass_filter(data, cutoff, numtaps=21):
     """A finite impulse response (FIR) lowpass filter to a given data using a
@@ -1254,8 +1152,6 @@ def find_r_peaks(ecg_signal,fs=200):
     Returns:
         list: the R-peak indices of the ECG signal using the Hamilton QRS complex detector algorithm.
     """
-##    out = hamilton_segmenter(signal=ecg_signal, sampling_rate=fs)
-##    r_index_ = out["rpeaks"]
     r_index_ = detect_beats(ecg_signal, fs)
     return r_index_
 
@@ -1650,221 +1546,221 @@ def funcs(sorted_data):
     df = pd.DataFrame({"DateTime":date_time, "ECG":data_list})
     return df 
 
-def find_s_newnew_index(ecg, R_index, d):
-    end_index = len(ecg) - 1
-    range_per = 0.03
-    small_range_per = 0.01
-    s = []
-    for r in R_index:
-        r_range = abs(ecg[r] * range_per)
-        r_range__ = abs(ecg[r] * small_range_per)
-        s_, sss = [], []
-        if r == len(ecg):
-            s.append(r)
-            continue
-        if ecg[r] > 0:
-            c = r
-            while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                c += 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    sss.append(c)
-            if (-(r_range) <= ecg[c] <= r_range)  or c == end_index or abs(r-c) > d:
-                s_.append(c)
-            # s_.append(c)
-            while c+1 <= end_index and abs(r-c) <= d:
-                while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == end_index:
-                    break
+# def find_s_newnew_index(ecg, R_index, d):
+#     end_index = len(ecg) - 1
+#     range_per = 0.03
+#     small_range_per = 0.01
+#     s = []
+#     for r in R_index:
+#         r_range = abs(ecg[r] * range_per)
+#         r_range__ = abs(ecg[r] * small_range_per)
+#         s_, sss = [], []
+#         if r == len(ecg):
+#             s.append(r)
+#             continue
+#         if ecg[r] > 0:
+#             c = r
+#             while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
+#                 c += 1
+#                 if (-(r_range) <= ecg[c] <= r_range):
+#                     sss.append(c)
+#             if (-(r_range) <= ecg[c] <= r_range)  or c == end_index or abs(r-c) > d:
+#                 s_.append(c)
+#             # s_.append(c)
+#             while c+1 <= end_index and abs(r-c) <= d:
+#                 while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
+#                     c += 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         sss.append(c)
+#                 while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
+#                     c += 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         sss.append(c)
+#                 if s_ and s_[-1] == c:
+#                     break
+#                 s_.append(c)
+#                 if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == end_index:
+#                     break
             
-        else:
-            c = r
-            while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                c += 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    sss.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == end_index or abs(r-c) > d:
-                s_.append(c)
-            # s_.append(c)
-            while c <= end_index and abs(r-c) <= d:
-                while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range)  or c == end_index:
-                    break
-        if s_ or sss:
-            a = 0
-            for _s in s_[::-1]:
-                if (-(r_range__) <= ecg[_s] <= r_range__):
-                    a = 1
-                    s.append(_s)
-                    break
-            if a == 0:
-                for _s in sss[::-1]:
-                    if (-(r_range__) <= ecg[_s] <= r_range__):
-                        a = 1
-                        s.append(_s)
-                        break
-            if a == 0:
-                if ecg[r] > 0:
-                    for _s in s_[::-1]:
-                        if ecg[_s] <= r_range:
-                            a = 1
-                            s.append(_s)
-                            break
-                    if a == 0:
-                        for _s in sss[::-1]:
-                            if ecg[_s] <= r_range__:
-                                a = 1
-                                s.append(_s)
-                                break
-                else:
-                    for _s in s_[::-1]:
-                        if -r_range <= ecg[_s] :
-                            a = 1
-                            s.append(_s)
-                            break
-                    if a == 0:
-                        for _s in sss[::-1]:
-                            if -r_range__ <= ecg[_s] :
-                                a = 1
-                                s.append(_s)
-                                break
-            if a == 0: 
-                if r+d<=len(ecg):
-                    s_array = ecg[r:r+d]
-                else:
-                    s_array = ecg[r:]
-                if ecg[r] > 0:
-                    s_index = r+np.where(s_array == min(s_array))[0][0]
-                else:
-                    s_index = r+np.where(s_array == max(s_array))[0][0]
-                s.append(s_index)
-    return np.sort(s)
+#         else:
+#             c = r
+#             while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
+#                 c += 1
+#                 if (-(r_range) <= ecg[c] <= r_range):
+#                     sss.append(c)
+#             if (-(r_range) <= ecg[c] <= r_range) or c == end_index or abs(r-c) > d:
+#                 s_.append(c)
+#             # s_.append(c)
+#             while c <= end_index and abs(r-c) <= d:
+#                 while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
+#                     c += 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         sss.append(c)
+#                 while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
+#                     c += 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         sss.append(c)
+#                 if s_ and s_[-1] == c:
+#                     break
+#                 s_.append(c)
+#                 if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range)  or c == end_index:
+#                     break
+#         if s_ or sss:
+#             a = 0
+#             for _s in s_[::-1]:
+#                 if (-(r_range__) <= ecg[_s] <= r_range__):
+#                     a = 1
+#                     s.append(_s)
+#                     break
+#             if a == 0:
+#                 for _s in sss[::-1]:
+#                     if (-(r_range__) <= ecg[_s] <= r_range__):
+#                         a = 1
+#                         s.append(_s)
+#                         break
+#             if a == 0:
+#                 if ecg[r] > 0:
+#                     for _s in s_[::-1]:
+#                         if ecg[_s] <= r_range:
+#                             a = 1
+#                             s.append(_s)
+#                             break
+#                     if a == 0:
+#                         for _s in sss[::-1]:
+#                             if ecg[_s] <= r_range__:
+#                                 a = 1
+#                                 s.append(_s)
+#                                 break
+#                 else:
+#                     for _s in s_[::-1]:
+#                         if -r_range <= ecg[_s] :
+#                             a = 1
+#                             s.append(_s)
+#                             break
+#                     if a == 0:
+#                         for _s in sss[::-1]:
+#                             if -r_range__ <= ecg[_s] :
+#                                 a = 1
+#                                 s.append(_s)
+#                                 break
+#             if a == 0: 
+#                 if r+d<=len(ecg):
+#                     s_array = ecg[r:r+d]
+#                 else:
+#                     s_array = ecg[r:]
+#                 if ecg[r] > 0:
+#                     s_index = r+np.where(s_array == min(s_array))[0][0]
+#                 else:
+#                     s_index = r+np.where(s_array == max(s_array))[0][0]
+#                 s.append(s_index)
+#     return np.sort(s)
 
-def find_q_newnew_index(ecg, R_index, d):
-    q = []
-    range_per = 0.03
-    small_range_per = 0.01
-    for r in R_index:
-        r_range = abs(ecg[r] * range_per)
-        r_range__ = abs(ecg[r] * small_range_per)
-        q_, qqq = [], []
-        if r == 0:
-            q.append(r)
-            continue
-        if ecg[r] > 0:
-            c = r
-            while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                c -= 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
-                q_.append(c)
-            # q_.append(c)
-            while c > 0 and abs(r-c) <= d:
-                while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                if q_ and q_[-1] == c:
-                    break
-                q_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
-                    break
-        else:
-            c = r
-            while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                c -= 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    qqq.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
-                q_.append(c)
-            # q_.append(c)
-            while c > 0 and abs(r-c) <= d:
-                while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                if q_ and q_[-1] == c:
-                    break
-                q_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
-                    break
-        if q_ or qqq:
-            a = 0
-            for _q in q_[::-1]:
-                if (-(r_range__) <= ecg[_q] <= r_range__):
-                    a = 1
-                    q.append(_q)
-                    break
-            if a == 0:
-                for _q in qqq[::-1]:
-                    if (-(r_range__) <= ecg[_q] <= r_range__):
-                        a = 1
-                        q.append(_q)
-                        break
-            if a == 0:
-                if ecg[r] > 0:
-                    for _q in q_[::-1]:
-                        if ecg[_q] <= r_range:
-                            a = 1
-                            q.append(_q)
-                            break
-                    if a == 0:
-                        for _q in qqq[::-1]:
-                            if ecg[_q] <= r_range__:
-                                a = 1
-                                q.append(_q)
-                                break
-                else:
-                    for _q in q_[::-1]:
-                        if -r_range <= ecg[_q] :
-                            a = 1
-                            q.append(_q)
-                            break
-                    if a == 0:
-                        for _q in qqq[::-1]:
-                            if -r_range__ <= ecg[_q] :
-                                a = 1
-                                q.append(_q)
-                                break
-            if a == 0:
-                if 0 <= r - d:
-                    q_array = ecg[r - d:r]
-                else:
-                    q_array = ecg[:r]
-                if ecg[r] > 0:
-                    q_index = r - (len(q_array) - np.where(q_array == min(q_array))[0][0])
-                else:
-                    q_index = r - (len(q_array) - np.where(q_array == max(q_array))[0][0])
-                q.append(q_index)
-    return np.sort(q)
+# def find_q_newnew_index(ecg, R_index, d):
+#     q = []
+#     range_per = 0.03
+#     small_range_per = 0.01
+#     for r in R_index:
+#         r_range = abs(ecg[r] * range_per)
+#         r_range__ = abs(ecg[r] * small_range_per)
+#         q_, qqq = [], []
+#         if r == 0:
+#             q.append(r)
+#             continue
+#         if ecg[r] > 0:
+#             c = r
+#             while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
+#                 c -= 1
+#                 if (-(r_range) <= ecg[c] <= r_range):
+#                         qqq.append(c)
+#             if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
+#                 q_.append(c)
+#             # q_.append(c)
+#             while c > 0 and abs(r-c) <= d:
+#                 while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
+#                     c -= 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         qqq.append(c)
+#                 while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
+#                     c -= 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         qqq.append(c)
+#                 if q_ and q_[-1] == c:
+#                     break
+#                 q_.append(c)
+#                 if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
+#                     break
+#         else:
+#             c = r
+#             while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
+#                 c -= 1
+#                 if (-(r_range) <= ecg[c] <= r_range):
+#                     qqq.append(c)
+#             if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
+#                 q_.append(c)
+#             # q_.append(c)
+#             while c > 0 and abs(r-c) <= d:
+#                 while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
+#                     c -= 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         qqq.append(c)
+#                 while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
+#                     c -= 1
+#                     if (-(r_range) <= ecg[c] <= r_range):
+#                         qqq.append(c)
+#                 if q_ and q_[-1] == c:
+#                     break
+#                 q_.append(c)
+#                 if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
+#                     break
+#         if q_ or qqq:
+#             a = 0
+#             for _q in q_[::-1]:
+#                 if (-(r_range__) <= ecg[_q] <= r_range__):
+#                     a = 1
+#                     q.append(_q)
+#                     break
+#             if a == 0:
+#                 for _q in qqq[::-1]:
+#                     if (-(r_range__) <= ecg[_q] <= r_range__):
+#                         a = 1
+#                         q.append(_q)
+#                         break
+#             if a == 0:
+#                 if ecg[r] > 0:
+#                     for _q in q_[::-1]:
+#                         if ecg[_q] <= r_range:
+#                             a = 1
+#                             q.append(_q)
+#                             break
+#                     if a == 0:
+#                         for _q in qqq[::-1]:
+#                             if ecg[_q] <= r_range__:
+#                                 a = 1
+#                                 q.append(_q)
+#                                 break
+#                 else:
+#                     for _q in q_[::-1]:
+#                         if -r_range <= ecg[_q] :
+#                             a = 1
+#                             q.append(_q)
+#                             break
+#                     if a == 0:
+#                         for _q in qqq[::-1]:
+#                             if -r_range__ <= ecg[_q] :
+#                                 a = 1
+#                                 q.append(_q)
+#                                 break
+#             if a == 0:
+#                 if 0 <= r - d:
+#                     q_array = ecg[r - d:r]
+#                 else:
+#                     q_array = ecg[:r]
+#                 if ecg[r] > 0:
+#                     q_index = r - (len(q_array) - np.where(q_array == min(q_array))[0][0])
+#                 else:
+#                     q_index = r - (len(q_array) - np.where(q_array == max(q_array))[0][0])
+#                 q.append(q_index)
+#     return np.sort(q)
 
 def wide_qrs(q_index, r_index, s_index, fs=200):
     label = 'Abnormal'
@@ -2322,130 +2218,130 @@ def find_r_peakss(ecg_signal,fs=200):
     return np.unique(r_) if r_ else r_index_
 
 
-def PACcounter(PAC_R_Peaks, hr_counts):
-    at_counter = 0
-    couplet_counter = 0
-    triplet_counter = 0
-    bigeminy_counter = 0
-    trigeminy_counter = 0
-    quadrigeminy_counter = 0
-    at = 0
-    i = 0
-    while i < len(PAC_R_Peaks):
-        count = 0
-        ones_count = 0
-        while i < len(PAC_R_Peaks) and PAC_R_Peaks[i] == 1:
-            count += 1
-            ones_count += 1
-            i += 1
+# def PACcounter(PAC_R_Peaks, hr_counts):
+#     at_counter = 0
+#     couplet_counter = 0
+#     triplet_counter = 0
+#     bigeminy_counter = 0
+#     trigeminy_counter = 0
+#     quadrigeminy_counter = 0
+#     at = 0
+#     i = 0
+#     while i < len(PAC_R_Peaks):
+#         count = 0
+#         ones_count = 0
+#         while i < len(PAC_R_Peaks) and PAC_R_Peaks[i] == 1:
+#             count += 1
+#             ones_count += 1
+#             i += 1
 
-        if count >= 4:
-            at_counter += 1
-            at += ones_count
-            count = 0
-            ones_count = 0
-        if count == 3:
-            triplet_counter += 1
-        elif count == 2:
-            couplet_counter += 1
+#         if count >= 4:
+#             at_counter += 1
+#             at += ones_count
+#             count = 0
+#             ones_count = 0
+#         if count == 3:
+#             triplet_counter += 1
+#         elif count == 2:
+#             couplet_counter += 1
 
-        i += 1
+#         i += 1
 
-    j = 0
-    while j < len(PAC_R_Peaks) - 1:
-        if PAC_R_Peaks[j] == 1:
-            k = j + 1
-            spaces = 0
-            while k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 0:
-                spaces += 1
-                k += 1
+#     j = 0
+#     while j < len(PAC_R_Peaks) - 1:
+#         if PAC_R_Peaks[j] == 1:
+#             k = j + 1
+#             spaces = 0
+#             while k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 0:
+#                 spaces += 1
+#                 k += 1
 
-            if k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 1:
-                if spaces == 1:
-                    bigeminy_counter += 1
-                elif spaces == 2:
-                    trigeminy_counter += 1
-                elif spaces == 3:
-                    quadrigeminy_counter += 1
-            j = k
+#             if k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 1:
+#                 if spaces == 1:
+#                     bigeminy_counter += 1
+#                 elif spaces == 2:
+#                     trigeminy_counter += 1
+#                 elif spaces == 3:
+#                     quadrigeminy_counter += 1
+#             j = k
 
-        else:
-            j += 1
+#         else:
+#             j += 1
     
-    total_one = (1*at) + (couplet_counter*2)+ (triplet_counter*3)+ (bigeminy_counter*2)+ (trigeminy_counter*2)+ (quadrigeminy_counter*2)
-    total = at_counter + couplet_counter+ triplet_counter+ bigeminy_counter+ trigeminy_counter+ quadrigeminy_counter
-    ones = PAC_R_Peaks.count(1)
-    if total == 0:
-        Isolated = ones
-    else:
-        Common = total-1
-        Isolated = ones - (total_one - Common)
-    if hr_counts > 100:
-        triplet_counter = couplet_counter = quadrigeminy_counter = trigeminy_counter = bigeminy_counter = Isolated = 0
-    if at_counter>=1 and hr_counts > 190:
-        at_counter=1
-    else:
-        at_counter=0
+#     total_one = (1*at) + (couplet_counter*2)+ (triplet_counter*3)+ (bigeminy_counter*2)+ (trigeminy_counter*2)+ (quadrigeminy_counter*2)
+#     total = at_counter + couplet_counter+ triplet_counter+ bigeminy_counter+ trigeminy_counter+ quadrigeminy_counter
+#     ones = PAC_R_Peaks.count(1)
+#     if total == 0:
+#         Isolated = ones
+#     else:
+#         Common = total-1
+#         Isolated = ones - (total_one - Common)
+#     if hr_counts > 100:
+#         triplet_counter = couplet_counter = quadrigeminy_counter = trigeminy_counter = bigeminy_counter = Isolated = 0
+#     if at_counter>=1 and hr_counts > 190:
+#         at_counter=1
+#     else:
+#         at_counter=0
 
-    data = {"PAC-ISO_counter":Isolated,
-            "PAC-Bigem_counter":bigeminy_counter,
-            "PAC-Trigem_counter":trigeminy_counter,
-            "PAC-Quadrigem_counter":quadrigeminy_counter,
-            "PAC-Couplet_counter":couplet_counter,
-            "PAC-Triplet_counter":triplet_counter,
-            "PAC-AT_counter":at_counter}
-    return data
+#     data = {"PAC-ISO_counter":Isolated,
+#             "PAC-Bigem_counter":bigeminy_counter,
+#             "PAC-Trigem_counter":trigeminy_counter,
+#             "PAC-Quadrigem_counter":quadrigeminy_counter,
+#             "PAC-Couplet_counter":couplet_counter,
+#             "PAC-Triplet_counter":triplet_counter,
+#             "PAC-AT_counter":at_counter}
+#     return data
 
-def wide_qrs_find(q_index, r_index, s_index, hr_count, fs=200):
-    """The distance between the QRS complex's Q wave and S wave.
+# def wide_qrs_find(q_index, r_index, s_index, hr_count, fs=200):
+#     """The distance between the QRS complex's Q wave and S wave.
 
-    Args:
-        q_index (list): Q waves indices in an ECG signal
-        r_index (list): R-peak indices in an ECG signal
-        s_index (list): S waves indices in an ECG signal
-        fs (int, optional): sampling rate of the ECG signal, defaults to 200 (optional)
+#     Args:
+#         q_index (list): Q waves indices in an ECG signal
+#         r_index (list): R-peak indices in an ECG signal
+#         s_index (list): S waves indices in an ECG signal
+#         fs (int, optional): sampling rate of the ECG signal, defaults to 200 (optional)
 
-    Returns:
-        array: the R-peak indices that correspond to wide QRS complexes in an ECG signal.
-    The function takes in three arrays as inputs: q_index, r_index, and s_index, which represent the
-    indices of the Q-wave onset, R-peak, and S-wave offset, respectively. The function loops through the
-    R-peak indices and calculates the difference between
-    """
-    max_indexs = 0
-    if hr_count <= 88:
-        ms = 0.10
-    else:
-        ms = 0.12
-    max_indexs = int(fs * ms)
-    pvc = []
-    difference = []
-    pvc_index = []
-    wide_qs_diff = []
-    for k in range(len(r_index)):
-        diff = s_index[k] - q_index[k]
-        difference.append(diff)
-        if max_indexs != 0:
-            if diff>=max_indexs:
-                pvc.append(r_index[k])
+#     Returns:
+#         array: the R-peak indices that correspond to wide QRS complexes in an ECG signal.
+#     The function takes in three arrays as inputs: q_index, r_index, and s_index, which represent the
+#     indices of the Q-wave onset, R-peak, and S-wave offset, respectively. The function loops through the
+#     R-peak indices and calculates the difference between
+#     """
+#     max_indexs = 0
+#     if hr_count <= 88:
+#         ms = 0.10
+#     else:
+#         ms = 0.12
+#     max_indexs = int(fs * ms)
+#     pvc = []
+#     difference = []
+#     pvc_index = []
+#     wide_qs_diff = []
+#     for k in range(len(r_index)):
+#         diff = s_index[k] - q_index[k]
+#         difference.append(diff)
+#         if max_indexs != 0:
+#             if diff>=max_indexs:
+#                 pvc.append(r_index[k])
 
-    if hr_count <= 88:
-        wide_r_index_per = len(pvc)/ len(r_index)
-        if wide_r_index_per < 0.8:
-            pvc_index = np.array(pvc)
-        else:
-            ms = 0.12
-            max_indexs = int(fs * ms)
-            for k in range(len(r_index)):
-                diff = s_index[k] - q_index[k]
-                wide_qs_diff.append(diff)
-                if max_indexs != 0:
-                    if diff>=max_indexs:
-                        pvc_index.append(r_index[k])
-            difference = wide_qs_diff
-    else:
-        pvc_index = np.array(pvc) 
-    q_s_difference = [i/200 for i in difference]
-    return np.array(pvc_index), q_s_difference
+#     if hr_count <= 88:
+#         wide_r_index_per = len(pvc)/ len(r_index)
+#         if wide_r_index_per < 0.8:
+#             pvc_index = np.array(pvc)
+#         else:
+#             ms = 0.12
+#             max_indexs = int(fs * ms)
+#             for k in range(len(r_index)):
+#                 diff = s_index[k] - q_index[k]
+#                 wide_qs_diff.append(diff)
+#                 if max_indexs != 0:
+#                     if diff>=max_indexs:
+#                         pvc_index.append(r_index[k])
+#             difference = wide_qs_diff
+#     else:
+#         pvc_index = np.array(pvc) 
+#     q_s_difference = [i/200 for i in difference]
+#     return np.array(pvc_index), q_s_difference
 
 class FilterSignal:
     def __init__(self, ecg_signal, fs = 200):
@@ -2502,7 +2398,7 @@ class FilterSignal:
             
         return self.baseline_signal, lowpass_signal
 
-class pqrst_detections:
+class PqrstDetection:
     def __init__(self, ecg_signal, fs=200, thres=0.5, lp_thres=0.2, rr_thres=0.12, width=(5, 50)):
         self.ecg_signal = ecg_signal
         self.fs = fs
@@ -3286,224 +3182,7 @@ class pqrst_detections:
                 'inv_t_index': self.inv_t_index}
         return data
 
-class block_detection:
-    def __init__(self, ecg_signal, fs):
-        self.ecg_signal = ecg_signal
-        self.fs = fs
-        self.block_processing()
-
-    def block_processing(self):
-        self.baseline_signal, self.lowpass_signal = FilterSignal(self.ecg_signal, self.fs).get_data()
-        pqrst_data = pqrst_detections(self.baseline_signal, fs=self.fs).get_data()
-        self.r_index = pqrst_data["R_index"]
-        self.q_index = pqrst_data["Q_Index"]
-        self.s_index = pqrst_data["S_Index"]
-        self.p_index = pqrst_data["P_Index"]
-        self.hr_counts = pqrst_data["HR_Count"]
-        self.p_t = pqrst_data["P_T List"]
-        self.pr = pqrst_data["PR_Interval"]
-
-    def third_degree_block_deetection(self):
-        label= 'Abnormal'
-        third_degree = []
-        possible_3rd = possible_mob_3rd = False
-        if self.hr_counts <= 100 and len(self.p_t) != 0: # 60 70
-            constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
-            cons_2_1 = all(len(inner_list) in {1, 2} for inner_list in self.p_t)
-            ampli_val = list(map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list),self.p_t))
-            count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
-            percentage_above_threshold = count_above_threshold / len(ampli_val)
-            count = 0
-            if percentage_above_threshold >= 0.7:
-                inc_dec_count = 0
-                for i in range(0, len(self.pr)):
-                    if self.pr[i] > self.pr[i -1]:
-                        inc_dec_count += 1
-                if round(inc_dec_count / (len(self.pr)), 2) >= 0.50 and constant_2 == False: # if posibale to change more then 0.5
-                    possible_mob_3rd = True
-                for inner_list in self.p_t:
-                    if len(inner_list) in [3, 4] :
-                        ampli_val = [self.baseline_signal[i] for i in inner_list] 
-                        if ampli_val  and (sum(value > 0.05 for value in ampli_val) / len(ampli_val)) > 0.7: 
-                            differences = np.diff(inner_list).tolist()
-                            diff_list = [x for x in differences if x >= 70]
-                            if len(diff_list) != 0:
-                                third_degree.append(1)
-                            else:
-                                third_degree.append(0)    
-                    elif len(inner_list) in [3,4] and possible_mob_3rd==True:
-                        differences = np.diff(inner_list).tolist()
-                        if all(diff > 70 for diff in differences):
-                            third_degree.append(1)
-                        else:
-                            third_degree.append(0)
-                    else:
-                        third_degree.append(0)
-        if len(third_degree) != 0:
-            if third_degree.count(1) /len(third_degree) >= 0.4 or possible_mob_3rd: # 0.5 0.4   
-                label = "3rd Degree block"
-        return label    
-
-    def second_degree_block_new(self):
-        label= 'Abnormal'
-        constant_3_peak = []
-        possible_mob_1 = False
-        possible_mob_2 = False
-        mob_count = 0
-        if self.hr_counts <= 100: # 80
-            if len(self.p_t) != 0:
-                constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
-                rhythm_flag = all(len(inner_list) in {1, 2, 3} for inner_list in self.p_t)
-                ampli_val = list(map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list), self.p_t))
-                count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
-                percentage_above_threshold = count_above_threshold / len(ampli_val)
-                if percentage_above_threshold >= 0.7:
-                    if rhythm_flag and constant_2 == False:
-                        pr_interval = []
-                        for i, r_element in enumerate(self.r_index[1:], start=1):
-                            if i <= len(self.p_t):
-                                inner_list = self.p_t[i - 1]  
-                                last_element = inner_list[-1] 
-                                result = r_element - last_element 
-                                pr_interval.append(result)
-
-                        counts = {}
-                        count_2 = 0
-                        for i in range(0, len(pr_interval)):
-                            counts[i] = 1
-                            if i in counts:
-                                counts[i] += 1
-                            if pr_interval[i] > pr_interval[i -1]:
-                                count_2 += 1
-                        most_frequent = max(counts.values())
-                        if round(count_2 / (len(pr_interval)), 2) >= 0.50: 
-                            possible_mob_1 = True
-                        elif round(most_frequent / len(pr_interval), 2) >= 0.4: 
-                            possible_mob_2 = True
-
-                        for inner_list in self.p_t:
-                            if len(inner_list) == 3 :
-                                differences = np.diff(inner_list).tolist()
-                                if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
-                                    if possible_mob_1 or possible_mob_2:
-                                        mob_count += 1
-                                    else:
-                                        constant_3_peak.append(1)
-                            else:
-                                constant_3_peak.append(0)
-                    else:
-                        for inner_list in self.p_t:
-                            if len(inner_list) == 3 :
-                                differences = np.diff(inner_list).tolist()
-                                if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
-                                    constant_3_peak.append(1)
-                                else:
-                                    constant_3_peak.append(0)
-                            else:
-                                constant_3_peak.append(0)
-        if len(constant_3_peak) != 0 and constant_3_peak.count(1) != 0:
-
-            if constant_3_peak.count(1) /len(constant_3_peak) >= 0.4: # 0.4 0.5
-                label = "Mobitz II"
-        elif possible_mob_1 and mob_count > 1: # 0 1 4
-            label = "Mobitz I"
-        elif possible_mob_2 and mob_count > 1: # 0  4
-            label = "Mobitz II"
-        return label
-
-    # Block new trans model for added 
-    def prediction_model_block(self, input_arr):
-        classes = ['1st_deg', '2nd_deg', '3rd_deg', 'abnormal', 'normal']
-        input_arr = tf.io.decode_jpeg(tf.io.read_file(input_arr), channels=3)
-        input_arr = tf.image.resize(input_arr, size=(224, 224), method=tf.image.ResizeMethod.BILINEAR)
-        input_arr = (tf.expand_dims(input_arr, axis=0),)
-        model_pred = predict_tflite_model(block_load_model, input_arr )[0]
-        # print(model_pred)
-        idx = np.argmax(model_pred)
-        return model_pred, classes[idx]
-
-    def check_block_model(self, low_ecg_signal):
-        label = 'Abnormal'
-        for i in glob.glob('temp_block_img' + "/*.jpg"):
-            os.remove(i)
-        
-        randome_number = random.randint(200000, 1000000)
-        temp_img = low_ecg_signal
-        plt.figure(layout="constrained")
-        plt.plot(temp_img)
-        plt.axis("off")
-        plt.savefig(f"temp_block_img/p_{randome_number}.jpg")
-        aq = cv2.imread(f"temp_block_img/p_{randome_number}.jpg")
-        aq = cv2.resize(aq, (1080, 460))
-        cv2.imwrite(f"temp_block_img/p_{randome_number}.jpg", aq)
-        plt.close()
-        ei_ti_label = []
-        files = sorted(glob.glob("temp_block_img/*.jpg"), key=extract_number)
-        for pvcfilename in files:
-            predictions, ids = self.prediction_model_block(pvcfilename)
-            # print(predictions, ids)
-            label = "Abnormal" #"Normal"
-            if str(ids) == "3rd_deg" and float(predictions[2]) > 0.78:
-                label = "3rd degree"
-            if str(ids) == "2nd_deg" and float(predictions[1]) > 0.78:
-                label = "2nd degree"
-            if str(ids) == "1st_deg" and float(predictions[0]) > 0.78:
-                label = "1st degree"
-
-            if 0.40 < float(predictions[1]) < 0.70:
-                ei_ti_label.append('2nd degree')
-            if 0.40 < float(predictions[0]) < 0.70:
-                ei_ti_label.append('1st degree')
-            if 0.40 < float(predictions[2]) < 0.70:
-                ei_ti_label.append('3rd degree')
-        return label, ei_ti_label, predictions
-
-# Block new trans model, need to add 80/20 approach
-def block_model_check(ecg_signal, frequency, abs_result):
-    model_label = 'Abnormal'
-    ei_ti_block = []
-    baseline_signal = baseline_construction_200(ecg_signal)
-    lowpass_signal = lowpass(baseline_signal)
-    get_block = block_detection(ecg_signal, frequency)
-     
-    block_result, ei_ti_label, model_pre = get_block.check_block_model(lowpass_signal)
-    if block_result == '1st degree' and abs_result != 'Abnormal':
-        model_label = 'I DEGREE'
-    if block_result == '2nd degree' and (abs_result == '' or abs_result == 'Mobitz II'):
-        if abs_result=="Mobitz I":
-            model_label = 'MOBITZ-I'
-        if abs_result=="Mobitz II":
-            model_label = 'MOBITZ-II'
-    if block_result == '3rd degree' and abs_result!="Abnormal":
-        model_label = 'III Degree'
-    if ei_ti_label:
-        if '1st degree' in ei_ti_label and abs_result!="Abnormal":
-            model_label = 'I DEGREE'
-            ei_ti_block.append({"Arrhythmia":"I DEGREE","percentage":model_pre[0]*100})
-        if '2nd degree' in ei_ti_label and (abs_result == 'Mobitz I' or abs_result == 'Mobitz II'):
-            if abs_result=="Mobitz I":
-                model_label = 'MOBITZ-I'
-                ei_ti_block.append({"Arrhythmia":"MOBITZ-I","percentage":model_pre[1]*100})
-            if abs_result=="Mobitz II":
-                model_label = 'MOBITZ-II'
-                ei_ti_block.append({"Arrhythmia":"MOBITZ-II","percentage":model_pre[1]*100})
-        if '3rd degree' in ei_ti_label and abs_result!="Abnormal":
-            model_label = 'III Degree'
-            ei_ti_block.append({"Arrhythmia":"III Degree","percentage":model_pre[2]*100})
-    return model_label, ei_ti_block
-
-def block_process(ecg_signal, frequency):
-    abs_result = 'Abnormal'
-    get_block = block_detection(ecg_signal, frequency)
-    second_deg_check = get_block.second_degree_block_new()
-    if second_deg_check != 'Abnormal':
-        abs_result = second_deg_check
-    if second_deg_check == 'Abnormal':
-        third_deg_check = get_block.third_degree_block_deetection()
-        abs_result = third_deg_check
-    return abs_result
-
-class afib_flutter_detection:
+class AfibFlutterDetection:
     def __init__(self, ecg_signal, r_index, q_index, s_index,p_index, p_t,pr_interval, load_model):
         self.ecg_signal = ecg_signal
         self.r_index = r_index
@@ -3677,7 +3356,7 @@ class afib_flutter_detection:
 def afib_fultter_model_check(ecg_signal, load_model,  frequency, newsublist):
     baseline_signal, lowpass_signal = FilterSignal(ecg_signal, frequency).get_data()
 
-    pqrst_data = pqrst_detections(baseline_signal, fs=frequency).get_data()
+    pqrst_data = PqrstDetection(baseline_signal, fs=frequency).get_data()
     r_label = pqrst_data['R_Label']
     r_index = pqrst_data['R_index']
     q_index = pqrst_data['Q_Index']
@@ -3688,12 +3367,12 @@ def afib_fultter_model_check(ecg_signal, load_model,  frequency, newsublist):
     afib_per = 0
     flutter_per = 0
     final_perc = 0 
-    afib_flutter = afib_flutter_detection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model)
+    afib_flutter = AfibFlutterDetection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model)
     abs_afib_flutter_check = afib_flutter.abs_afib_flutter_check()
     ei_ti = []
     label = "Abnormal"
     if abs_afib_flutter_check:
-        check_2nd_lead,afib_data_index, flutter_data_index = afib_flutter_detection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model).get_data(newsublist)
+        check_2nd_lead,afib_data_index, flutter_data_index = AfibFlutterDetection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model).get_data(newsublist)
         
         afib_per = int(check_2nd_lead['AFIB']*100)
         flutter_per = int(check_2nd_lead['FLUTTER']*100)
@@ -4045,20 +3724,36 @@ def check_mi_model(all_leads_data, imageresource):
         mi_result = "T_wave_Abnormality"
     return mi_result
 
-def data_convert_MI(sorted_data): # patient_id, path=None
+def data_convert_MI(sorted_data, version): # patient_id, path=None
     A = pd.DataFrame(sorted_data)[['dateTime', 'data']]
     try:
         tog_arr = 0
-        temp_A = pd.DataFrame(sorted_data)[['data1', 'data5']]
-        if temp_A['data1'][0]=="": tog_arr = 1
-        A1 = temp_A['data1'].to_list()
-        A5 = temp_A['data5'].to_list()
+        if version == 5:
+            temp_A = pd.DataFrame(sorted_data)[['data1', 'data5']]
+            if temp_A['data1'][0]=="": tog_arr = 1
+            A1 = temp_A['data1'].to_list()
+            A5 = temp_A['data5'].to_list()
+        elif version == 8:
+            temp_A = pd.DataFrame(sorted_data)[['data1', 'data5', 'vOne', 'vTwo', 'vThree', 'vFour', 'vSix']]
+            if temp_A['data1'][0]=="": tog_arr = 1
+            A1 = temp_A['data1'].to_list()
+            A5 = temp_A['data5'].to_list()
+            v1 = A['vOne'].to_list()
+            v2 = A['vTwo'].to_list()
+            v3 = A['vThree'].to_list()
+            v4 = A['vFour'].to_list()
+            v6 = A['vSix'].to_list()
+        else: 
+            tog_arr = 1
     except Exception as e:
         tog_arr = 1
     A2 = A['data'].to_list()
     
     l, l1, l5 = [], [], []
-    data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[],"v5":[]} # "DateTime":[],
+    if version == 5:
+        data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[],"v5":[]} # "DateTime":[],
+    elif version == 8:
+        data_dict = {"I":[],"II":[],"III":[],"aVR":[],"aVL":[],"aVF":[], "v1":[], "v2":[], "v3":[], "v4":[], "v5":[], "v6":[]}
     if tog_arr == 0:
         for i in range(len(A2)):
             # d = A["dateTime"][i]
@@ -4067,58 +3762,162 @@ def data_convert_MI(sorted_data): # patient_id, path=None
             start = 0
             stop = 4
             kk= 0
-            while True:
-                l = A2[i][start:stop]
-                l1 = A1[i][start:stop]
-                l5 = A5[i][start:stop]
-                
-                high = l[2]+l[3]
-                low = l[0]+ l[1]
-                high1 = l1[2]+l1[3]
-                low1 = l1[0]+ l1[1]
-                high5 = l5[2]+l5[3]
-                low5 = l5[0]+ l5[1]
+            if version == 5:
+                while True:
+                    l = A2[i][start:stop]
+                    l1 = A1[i][start:stop]
+                    l5 = A5[i][start:stop]
+                    
+                    high = l[2]+l[3]
+                    low = l[0]+ l[1]
+                    high1 = l1[2]+l1[3]
+                    low1 = l1[0]+ l1[1]
+                    high5 = l5[2]+l5[3]
+                    low5 = l5[0]+ l5[1]
 
-                highdec = int(str(high), 16) # 18
-                lowdec = int(str(low),16)
-                val = (int(highdec)*256)+(int(lowdec))
-                val = ((val + 32768) % 65536) - 32768
-                voltage2 = (4.6/4095)*val/4
-                
-                highdec1 = int(str(high1), 16)
-                lowdec1 = int(str(low1),16)
-                val1 = (int(highdec1)*256)+(int(lowdec1))
-                val1 = ((val1 + 32768) % 65536) - 32768
-                voltage1 = (4.6/4095)*val1/4
-                
-                highdec5 = int(str(high5), 16)
-                lowdec5 = int(str(low5),16)
-                val5 = (int(highdec5)*256)+(int(lowdec5))
-                val5 = ((val5 + 32768) % 65536) - 32768
-                voltage5 = (4.6/4095)*val5/4
-                
-                voltage3 = voltage2 - voltage1
-                
-                aVR = -(voltage1 + voltage2)  / 2
+                    highdec = int(str(high), 16) # 18
+                    lowdec = int(str(low),16)
+                    val = (int(highdec)*256)+(int(lowdec))
+                    val = ((val + 32768) % 65536) - 32768
+                    voltage2 = (4.6/4095)*val/4
+                    
+                    highdec1 = int(str(high1), 16)
+                    lowdec1 = int(str(low1),16)
+                    val1 = (int(highdec1)*256)+(int(lowdec1))
+                    val1 = ((val1 + 32768) % 65536) - 32768
+                    voltage1 = (4.6/4095)*val1/4
+                    
+                    highdec5 = int(str(high5), 16)
+                    lowdec5 = int(str(low5),16)
+                    val5 = (int(highdec5)*256)+(int(lowdec5))
+                    val5 = ((val5 + 32768) % 65536) - 32768
+                    voltage5 = (4.6/4095)*val5/4
+                    
+                    voltage3 = voltage2 - voltage1
+                    
+                    aVR = -(voltage1 + voltage2)  / 2
 
-                aVL = (voltage1 - voltage3) / 2
+                    aVL = (voltage1 - voltage3) / 2
 
-                aVF = (voltage2 - voltage3)/ 2
-                
-                data_dict["I"].append(voltage1)
-                data_dict["II"].append(voltage2)
-                data_dict["III"].append(voltage3)
-                data_dict["aVR"].append(aVR)
-                data_dict["aVL"].append(aVL)
-                data_dict["aVF"].append(aVF)
-                data_dict["v5"].append(voltage5)
-                
-                # data_dict["DateTime"].append(d)
-                start+=4
-                stop+=4
-                kk+=1
-                if stop> len(A2[i]):
-                    break
+                    aVF = (voltage2 - voltage3)/ 2
+                    
+                    data_dict["I"].append(voltage1)
+                    data_dict["II"].append(voltage2)
+                    data_dict["III"].append(voltage3)
+                    data_dict["aVR"].append(aVR)
+                    data_dict["aVL"].append(aVL)
+                    data_dict["aVF"].append(aVF)
+                    data_dict["v5"].append(voltage5)
+                    
+                    # data_dict["DateTime"].append(d)
+                    start+=4
+                    stop+=4
+                    kk+=1
+                    if stop> len(A2[i]):
+                        break
+            elif self.lead_12:
+                while True:
+                    l = A2[i][start:stop]
+                    l1 = A1[i][start:stop]
+                    l5 = A5[i][start:stop]
+                    lv1 = v1[i][start:stop]
+                    lv2 = v2[i][start:stop]
+                    lv3 = v3[i][start:stop]
+                    lv4 = v4[i][start:stop]
+                    lv6 = v6[i][start:stop]
+                    
+                    high = l[2]+l[3]
+                    low = l[0]+ l[1]
+                    high1 = l1[2]+l1[3]
+                    low1 = l1[0]+ l1[1]
+                    high5 = l5[2]+l5[3]
+                    low5 = l5[0]+ l5[1]
+                    v1_high = lv1[2]+lv1[3]
+                    v1_low = lv1[0]+ lv1[1]
+                    v2_high = lv2[2]+lv2[3]
+                    v2_low = lv2[0]+ lv2[1]
+                    v3_high = lv3[2]+lv3[3]
+                    v3_low = lv3[0]+ lv3[1]
+                    v4_high = lv4[2]+lv4[3]
+                    v4_low = lv4[0]+ lv4[1]
+                    v6_high = lv6[2]+lv6[3]
+                    v6_low = lv6[0]+ lv6[1]
+
+                    highdec = int(str(high), 16) # 18
+                    lowdec = int(str(low),16)
+                    val = (int(highdec)*256)+(int(lowdec)) # val = (float(highdec)*256)+(float(lowdec))
+                    val = ((val + 32768) % 65536) - 32768
+                    voltage2 = (4.6/4095)*val/4
+                    
+                    highdec1 = int(str(high1), 16)
+                    lowdec1 = int(str(low1),16)
+                    val1 = (int(highdec1)*256)+(int(lowdec1))
+                    val1 = ((val1 + 32768) % 65536) - 32768
+                    voltage1 = (4.6/4095)*val1/4
+                    
+                    highdec5 = int(str(high5), 16)
+                    lowdec5 = int(str(low5),16)
+                    val5 = (int(highdec5)*256)+(int(lowdec5))
+                    val5 = ((val5 + 32768) % 65536) - 32768
+                    voltage5 = (4.6/4095)*val5/4
+
+                    high_temp_v1 = int(str(v1_high), 16)
+                    low_temp_v1 = int(str(v1_low),16)
+                    vol_v1 = (int(high_temp_v1)*256)+(int(low_temp_v1))
+                    vol_v1 = ((vol_v1 + 32768) % 65536) - 32768
+                    v1_voltage = (4.6/4095)*vol_v1/4
+
+                    high_temp_v2 = int(str(v2_high), 16)
+                    low_temp_v2 = int(str(v2_low),16)
+                    vol_v2 = (int(high_temp_v2)*256)+(int(low_temp_v2))
+                    vol_v2 = ((vol_v2 + 32768) % 65536) - 32768
+                    v2_voltage = (4.6/4095)*vol_v2/4
+
+                    high_temp_v3 = int(str(v3_high), 16)
+                    low_temp_v3 = int(str(v3_low),16)
+                    vol_v3 = (int(high_temp_v3)*256)+(int(low_temp_v3))
+                    vol_v3 = ((vol_v3 + 32768) % 65536) - 32768
+                    v3_voltage = (4.6/4095)*vol_v3/4
+
+                    high_temp_v4 = int(str(v4_high), 16)
+                    low_temp_v4 = int(str(v4_low),16)
+                    vol_v4 = (int(high_temp_v4)*256)+(int(low_temp_v4))
+                    vol_v4 = ((vol_v4 + 32768) % 65536) - 32768
+                    v4_voltage = (4.6/4095)*vol_v4/4
+
+                    high_temp_v6 = int(str(v6_high), 16)
+                    low_temp_v6 = int(str(v6_low),16)
+                    vol_v6 = (int(high_temp_v6)*256)+(int(low_temp_v6))
+                    vol_v6 = ((vol_v6 + 32768) % 65536) - 32768
+                    v6_voltage = (4.6/4095)*vol_v6/4
+                    
+                    voltage3 = voltage2 - voltage1
+                    
+                    aVR = -(voltage1 + voltage2)  / 2
+
+                    aVL = (voltage1 - voltage3) / 2
+
+                    aVF = (voltage2 - voltage3)/ 2
+                    
+                    data_dict["I"].append(voltage1)
+                    data_dict["II"].append(voltage2)
+                    data_dict["III"].append(voltage3)
+                    data_dict["aVR"].append(aVR)
+                    data_dict["aVL"].append(aVL)
+                    data_dict["aVF"].append(aVF)
+                    data_dict["v1"].append(v1_voltage)
+                    data_dict["v2"].append(v2_voltage)
+                    data_dict["v3"].append(v3_voltage)
+                    data_dict["v4"].append(v4_voltage)
+                    data_dict["v5"].append(voltage5)
+                    data_dict["v6"].append(v6_voltage)
+                    
+                    data_dict["DateTime"].append(d)
+                    start+=4
+                    stop+=4
+                    kk+=1
+                    if stop> len(A2[i]):
+                        break
 
     df = {}
     if tog_arr == 0:
@@ -4153,7 +3952,918 @@ def rrirrAB(rpeaks):
         label = "REGULAR"
     return label
 
+def check_r_index(all_leads_data, frequency, version):
+    print("----------------- R index -----------------")
+    median_r_list = []
+    combine_r_index = {}
+    
+    for lead in all_leads_data.keys():
+        if lead in ["I",'II', 'III']:
+            ecg_signal = all_leads_data[lead].values
+            baseline_signal = baseline_construction_200(ecg_signal, 101)
+            lowpass_signal = lowpass(baseline_signal)
+            rpeaks = detect_beats(lowpass_signal, frequency)
+            combine_r_index[lead] = rpeaks
+    if version == 2:
+        median_r_list = combine_r_index['II'].tolist()
+    elif version == 5:
+        min_length = min(len(combine_r_index['I']), len(combine_r_index['II']), len(combine_r_index['III']))
+        median_r_list = [int(np.median([combine_r_index['I'][i], combine_r_index['II'][i], combine_r_index['III'][i]])) for i in range(min_length)]
+    #print(median_r_list, "median_r_list", type(median_r_list))
+    return median_r_list
+
+def check_qs_index(all_leads_data, r_index ,frequency, version):
+    print("-------------------- Q & S detection ---------------------")
+    s_index, q_index = [], []
+    combine_indexs = {}
+    
+    for lead in all_leads_data.keys():
+        if lead in ["I",'II', 'III']:
+            ecg_signal = all_leads_data[lead].values
+            baseline_signal = baseline_construction_200(ecg_signal, 101)
+            lowpass_signal = lowpass(baseline_signal)
+            s_index_list = find_s_indexs(baseline_signal, r_index, 20)
+            q_index_list = find_q_indexs(baseline_signal, r_index, 15)
+            combine_indexs[lead] = {
+                's_idx': s_index_list,
+                'q_idx': q_index_list
+            }
+    if version == 2:
+        s_index = combine_indexs['II']['s_idx']
+        q_index = combine_indexs['II']['q_idx']
+    elif version == 5:
+        min_s_length = min(len(combine_indexs['I']['s_idx']), len(combine_indexs['II']['s_idx']), len(combine_indexs['III']['s_idx']))
+        median_s_list = [int(np.median([combine_indexs['I']['s_idx'][i], combine_indexs['II']['s_idx'][i], combine_indexs['III']['s_idx'][i]])) for i in range(min_s_length)]
+        s_index = median_s_list
+        min_q_length = min(len(combine_indexs['I']['q_idx']), len(combine_indexs['II']['q_idx']), len(combine_indexs['III']['q_idx']))
+        median_q_list = [int(np.median([combine_indexs['I']['q_idx'][i], combine_indexs['II']['q_idx'][i], combine_indexs['III']['q_idx'][i]])) for i in range(min_q_length)]
+        q_index = median_q_list
+    return s_index, q_index
+
+class PVCDetection:
+    def __init__(self, get_signal, fs, r_index, date_time, patientid, is_lead = 2):
+        self.get_signal = get_signal
+        self.fs = fs
+        self.is_lead = is_lead
+        self.r_index = r_index
+        self.date_time = date_time
+        self.patientid = patientid
+
+    def pvc_count_finds(self, sequence, HR):
+        triplet_pattern = [1, 1, 1]
+        couplet_pattern = [1, 1]
+        bigem_pattern = [1, 0, 1]
+        trigeminy_pattern = [1, 0, 0, 1]
+        quadrigeminy_pattern = [1, 0, 0, 0, 1]
+    
+        triplet_count = 0
+        couplet_count = 0
+        bigem_count = 0
+        trigeminy_count = 0
+        quadrigeminy_count = 0
+        aivr_count = 0
+        ivr_count = 0
+        nsvt_count = 0
+        vt_count = 0
+        beat_indices = set()
+    
+        def matches(subsequence, pattern):
+            return subsequence == pattern
+    
+        i = 0
+        while i < len(sequence):
+            if sequence[i] == 1:
+                start = i
+                while i < len(sequence) and sequence[i] == 1:
+                    i += 1
+                length = i - start
+                if length == 4 and int(HR)<=100:
+                    ivr_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+                elif 5 <= length <= 12 and (int(HR)>60 and int(HR)<=300):
+                    nsvt_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+                elif length >= 13 and int(HR)>100:
+                    vt_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+            else:
+                i += 1
+    
+        
+        for i in range(len(sequence)):
+            # Triplet
+            if i + 3 <= len(sequence):
+                subseq = sequence[i:i+3]
+                if matches(subseq, triplet_pattern):
+                    if all(j not in beat_indices for j in range(i, i+3)):
+                        triplet_count += 1
+                        for j in range(i, i+3):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Couplet
+            if i + 2 <= len(sequence):
+                subseq = sequence[i:i+2]
+                if matches(subseq, couplet_pattern):
+                    if all(j not in beat_indices for j in range(i, i+2)):
+                        couplet_count += 1
+                        for j in range(i, i+2):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Bigeminy
+            if i + 3 <= len(sequence):
+                subseq = sequence[i:i+3]
+                if matches(subseq, bigem_pattern):
+                    if all(j not in beat_indices for j in range(i, i+3)):
+                        bigem_count += 1
+                        for j in range(i, i+3):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Trigeminy
+            if i + 4 <= len(sequence):
+                subseq = sequence[i:i+4]
+                if matches(subseq, trigeminy_pattern):
+                    if all(j not in beat_indices for j in range(i, i+4)):
+                        trigeminy_count += 1
+                        for j in range(i, i+4):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+            # Quadrigeminy
+            if i + 5 <= len(sequence):
+                subseq = sequence[i:i+5]
+                if matches(subseq, quadrigeminy_pattern):
+                    if all(j not in beat_indices for j in range(i, i+5)):
+                        quadrigeminy_count += 1
+                        for j in range(i, i+5):
+                            if sequence[j] == 1:
+                                beat_indices.add(j)
+    
+        # Isolated PVCs
+        isolated_beats = 0
+        for idx, val in enumerate(sequence):
+            if val == 1 and idx not in beat_indices:
+                isolated_beats += 1
+                beat_indices.add(idx)
+    
+        total_beats = len(beat_indices)
+    
+        return {
+            "Isolated": isolated_beats,
+            "Bigeminy": bigem_count,
+            "Trigeminy": trigeminy_count,
+            "Quadrigeminy": quadrigeminy_count,
+            "Couplet": couplet_count,
+            "Triplet": triplet_count,
+            "Aivr": aivr_count,
+            "IVR": ivr_count,
+            "NSVT": nsvt_count,
+            "VT": vt_count,
+            "Total Beats": total_beats
+        }
+
+    def get_pvc_data(self):
+        print("---------------- PVC detection --------------------")
+        all_lead_pvc_data, result_pvc_data = {},{}
+        newdatepvclist=[]
+        pvc_label, lbbb_rbbb_label = "Abnormal", "Abnormal"
+        all_lead_data = self.get_signal
+        
+        temp_uuid = str(uuid.uuid1())
+        imageresource_pvc = os.path.join("temp_pvc_img/", temp_uuid)
+        os.makedirs(imageresource_pvc)
+        
+        if len(all_lead_data) != 0:
+            if self.is_lead == 8:
+                analysis_leads = ['I','II','III', 'v1', 'v5']
+            elif self.is_lead == 5:
+                analysis_leads = ['I','II','III']
+            else:
+                analysis_leads = ['II']
+            for lead in all_lead_data.keys():
+                if lead in analysis_leads: #['I', 'II', 'III', 'aVR', 'aVL', 'aVF', 'v1', 'v2', 'v3', 'v4', 'v5', 'v6']:
+                    lead_data = {}
+                    ecg_signal = all_lead_data[lead]
+                    lis= []
+                    count= 1
+                    if self.is_lead == 2:
+                        base_ecg = baseline_construction_200(ecg_signal,101)
+                        pvc_data = lowpass(base_ecg)
+                        
+                    else:
+                        base_ecg = baseline_construction_200(ecg_signal,101)
+                        pvc_data = lowpass(base_ecg)
+                    
+                        
+                    aboutdatas = pd.DataFrame(pvc_data)
+                    rpeaks = self.r_index 
+                    lead_data['rpeaks'] = rpeaks
+                    hr = hr_count(aboutdatas, rpeaks)
+                    
+                    lead_data['hr'] = hr
+                    lis = []
+                    for i in rpeaks:
+                        lis.append(i)
+
+                        if i == rpeaks[0]:
+                            count += 1
+                            lis.append(i)
+                            try:
+                                window_start = int(lis[0]) - 20
+                            except:
+                                window_start = int(lis[0]) - 20
+
+                            window_end = int(lis[0]) + 110
+                        elif i == rpeaks[1]:
+                            count += 1
+                            lis.append(i)
+                            window_start = int(lis[0]) - 50
+                            window_end = int(lis[0]) + 130
+                        else:
+                            count += 1
+                            lis.append(i)
+                            window_start = int(lis[0]) - 50
+                            window_end = int(lis[0]) + 80
+
+                        aa = pd.DataFrame(aboutdatas.iloc[window_start:window_end])
+                        plt.plot(aa,color='blue')
+                        plt.axis("off")
+
+                        plt.savefig(f"{imageresource_pvc}/p_{lead}_{int(lis[0])}.jpg")
+                        aq = cv2.imread(f"{imageresource_pvc}/p_{lead}_{int(lis[0])}.jpg")
+                        aq = cv2.resize(aq, (360, 720))
+                        cv2.imwrite(f"{imageresource_pvc}/p_{lead}_{int(lis[0])}.jpg", aq)
+                        lis.clear()
+                        plt.close()
+                    
+                    observer = []
+                    LBBB_list, RBBB_list = [], []
+                    
+                    files = sorted(glob.glob(imageresource_pvc+f"/p_{lead}_*.jpg"), key=extract_number)
+
+                    for pvcfilename in files:
+                        predictions,ids = prediction_model(pvcfilename)
+                        # print(predictions,ids)
+                        if str(ids) == "PVC" and float(predictions[3])>0.92:
+                            observer.append(1)
+                            plot_r_index = int(pvcfilename.split("_")[-1].split(".jpg")[0])
+                            if lead == 'II':
+                                datetimeapp = int(self.date_time[int(pvcfilename.split("_")[-1].split(".jpg")[0])])
+                                shutil.copy(pvcfilename,"pvcs/"+self.patientid+"/"+"p_"+str(pvcfilename.split("_")[-1].split(".jpg")[0]+"_"+str(datetimeapp)+".jpg"))
+                                newdatepvclist.append(str(self.date_time[plot_r_index]))
+                        else:
+                            observer.append(0)
+
+                        if str(ids) == "LBBB" and float(predictions[0]) > 0.78:
+                            LBBB_list.append(1)
+                        else:
+                            LBBB_list.append(0)
+
+                        if str(ids) == "RBBB" and float(predictions[4]) > 0.78:
+                            RBBB_list.append(1)
+                        else:
+                            RBBB_list.append(0)
+
+                    counts_result = self.pvc_count_finds(observer, hr)
+                    r_index_plot = [rpeaks[i] for i in range(len(observer)) if observer[i] == 1]
+                    lbbb_index = [rpeaks[i] for i in range(len(LBBB_list)) if LBBB_list[i] == 1]
+                    rbbb_index = [rpeaks[i] for i in range(len(RBBB_list)) if RBBB_list[i] == 1]
+                    pvc_label_counts = {
+                        'PVC-Isolated_counter': counts_result['Isolated'],
+                        'PVC-Bigeminy_counter': counts_result['Bigeminy'],
+                        'PVC-Trigeminy_counter': counts_result['Trigeminy'],
+                        'PVC-Quadrigeminy_counter':counts_result['Quadrigeminy'],
+                        'PVC-Couplet_counter':counts_result['Couplet'],
+                        'PVC-Triplet_counter':counts_result['Triplet'],
+                        'PVC-NSVT_counter':counts_result['NSVT'],
+                        'PVC-Aivr_counter':counts_result['Aivr'],
+                        'PVC-Ivr_counter':counts_result['IVR'],
+                        'PVC-VT_counter':counts_result['VT'],
+                        'pvc_r_index': r_index_plot,
+                    }
+                    pvc_label = '; '.join([key.split('_')[0] for key, val in pvc_label_counts.items() if 'counter' in key and val > 0])
+                    if len(pvc_label) == 0:
+                        pvc_label = 'Normal'
+                    if rpeaks:
+                      if len(lbbb_index)/ len(rpeaks)> 0.3:
+                          lbbb_rbbb_label = "LBBB"
+                      if len(rbbb_index)/ len(rpeaks) > 0.3:
+                          lbbb_rbbb_label = "RBBB"
+                    lead_data['pvc_index'] = pvc_label_counts['pvc_r_index']
+                    lead_data['pvc_label'] = pvc_label
+                    lead_data['lbbb_rbbb_label'] = lbbb_rbbb_label
+                    lead_data['lbbb_index'] = lbbb_index
+                    lead_data['rbbb_index'] = rbbb_index
+                    lead_data['count_dict'] = pvc_label_counts
+                    all_lead_pvc_data[lead]= lead_data
+            for i in glob.glob(imageresource_pvc+"/*.jpg"):
+                os.remove(i)
+            remove_temp_folder(imageresource_pvc)
+            if len(all_lead_pvc_data.keys())> 1:
+                combined_labels = []
+                for data in all_lead_pvc_data.values():
+                    temp_label = data['pvc_label'].split('; ')
+                    if len(temp_label) > 1:
+                        combined_labels.extend(temp_label)
+                    else:
+                        combined_labels.append(data['pvc_label'])
+                    combined_labels.append(data['lbbb_rbbb_label'])
+                label_counts = Counter(combined_labels)
+                if self.is_lead == 8:
+                    repeated_elements = [item for item, count in label_counts.items() if count > 2]
+                else:
+                    repeated_elements = [item for item, count in label_counts.items() if count > 1]
+                
+                if 'NSVT' in label_counts and label_counts['NSVT'] != 3:
+                    repeated_elements.remove('PVC-NSVT')
+                if 'Aivr' in label_counts and label_counts['Aivr'] != 3:
+                    repeated_elements.remove('PVC-Aivr')
+                if 'Ivr' in label_counts and label_counts['Ivr'] != 3:
+                    repeated_elements.remove('PVC-Ivr')
+
+                if len(repeated_elements) > 1:
+                    if 'Abnormal' in repeated_elements:
+                        repeated_elements.remove('Abnormal')
+                pvc_final_index = ' '.join(repeated_elements)
+                result_pvc_data['pvc_label'] = pvc_final_index
+                pvc_matching_keys, lbbb_rbbb_matching_keys = [], []
+                pvc_matching_keys = [
+                    key for key, data in all_lead_pvc_data.items()
+                    if any(element in data['pvc_label'] for element in repeated_elements)
+                ]
+                if pvc_matching_keys:
+                    result_pvc_data['pvc_index'] = all_lead_pvc_data[pvc_matching_keys[0]]['pvc_index']
+                else:
+                    result_pvc_data['pvc_index'] = []
+                result_pvc_data['pvc_counts']= all_lead_pvc_data[pvc_matching_keys[0]]['count_dict']
+                if label_counts['RBBB'] == 3 or label_counts['LBBB'] == 3:
+                    result_pvc_data['lbbb_rbbb_label'] = lbbb_rbbb_label
+                    lbbb_rbbb_matching_keys = [
+                        key for key, data in all_lead_pvc_data.items()
+                        if any(element in data['lbbb_rbbb_label'] for element in repeated_elements)
+                    ]
+                    if label_counts['RBBB'] == 3:
+                        result_pvc_data['rbbb_index'] = all_lead_pvc_data[lbbb_rbbb_matching_keys[0]]['rbbb_index']
+                    if label_counts['LBBB'] == 3:
+                        result_pvc_data['lbbb_index'] = all_lead_pvc_data[lbbb_rbbb_matching_keys[0]]['lbbb_index']
+                    
+                else:
+                    result_pvc_data['lbbb_index'] = []
+                    result_pvc_data['rbbb_index'] = []
+                    result_pvc_data['lbbb_rbbb_label'] = 'Abnormal'
+                pvc_observer = [1 if self.r_index[i] in result_pvc_data['pvc_index'] else 0 for i in range(len(self.r_index))]
+                result_pvc_data['observer'] = pvc_observer
+            else:
+                pvc_observer = [1 if self.r_index[i] in all_lead_pvc_data['II']['pvc_index'] else 0 for i in range(len(self.r_index))]
+                result_pvc_data = {
+                    'pvc_index': all_lead_pvc_data['II']['pvc_index'],
+                    'lbbb_index': all_lead_pvc_data['II']['lbbb_index'],
+                    'rbbb_index': all_lead_pvc_data['II']['rbbb_index'],
+                    'pvc_label': all_lead_pvc_data['II']['pvc_label'],
+                    'lbbb_rbbb_label': all_lead_pvc_data['II']['lbbb_rbbb_label'],
+                    'observer': pvc_observer,
+                    'pvc_counts': all_lead_pvc_data['II']['count_dict']
+                }
+            result_pvc_data['newdatepvclist'] = newdatepvclist
+        return result_pvc_data
+
+class PACDetection:
+    def __init__(self, get_signal, r_index, fs, is_lead = 2):
+        self.get_signal = get_signal
+        self.fs = fs
+        self.is_lead = is_lead
+        self.r_index = r_index
+
+    def get_pac_data(self):
+        print("----------------------- PAC detection -----------------------------")
+        all_lead_pac_data, results_pac = {}, {}
+        all_lead_data = self.get_signal
+        if self.is_lead == 8:
+            analysis_leads = ['I','II','III', 'v1', 'v5']
+        elif self.is_lead == 5:
+            analysis_leads = ['I','II','III']
+        else:
+            analysis_leads = ['II']
+
+        for lead in all_lead_data.keys():
+            if lead in analysis_leads: 
+                lead_data = {}
+                ecg_signal = all_lead_data[lead]
+                pac_label, junctional_label = 'Abnormal', 'Abnormal'
+                
+                base_signal = baseline_construction_200(ecg_signal,131)
+                lowpass_signal = lowpass(base_signal, cutoff=0.2)
+                
+                apeds = []
+                r_index = self.r_index
+                hr = hr_count(lowpass_signal, r_index)
+                rr_thres = 0.12
+                rr_intervals = np.diff(r_index)
+                rr_std = np.std(rr_intervals)
+                rr_mean = np.mean(rr_intervals)
+                threshold = rr_thres * rr_mean
+                if rr_std <= threshold:
+                    R_label = "Regular"
+                else:
+                    R_label = "Irregular"
+
+                lead_data['r_index'] = r_index
+                lead_data['hr'] = hr
+                lead_data['R_label'] = R_label
+                updated_union, pac_detect, junc_detect, junc_union =[], [],[], []
+                for i in range(len(r_index)-1):
+                    m=r_index[i+1]-r_index[i]
+                    apeds.append(m*5/1000)
+
+                variations=[]
+                for i in range(len(apeds)-1):
+                    variations.append(get_percentage_diff(apeds[i+1],apeds[i]))
+
+                forPAC = Average(variations) 
+                lead_data['forPAC'] = forPAC                  
+                if Average(variations)<0.20:
+                    updated_union=[0,0,0,0,0,0,0,0]
+                    lead_data['updated_union'] = updated_union
+                    lead_data['junctional_label'] = junctional_label
+                    lead_data['pac_label'] = pac_label
+                    lead_data['pac_detect'] = pac_detect
+                    lead_data['variations'] = variations
+                    lead_data['pac_counts'] = {}
+                    lead_data['junc_union'] = junc_union
+                    lead_data['junc_detect'] = junc_detect
+                    all_lead_pac_data[lead] = lead_data
+                    pass
+                else:
+                    try:
+                        for i in range(len(r_index) - 1):
+                            fig, ax = plt.subplots(num=1, clear=True)
+                            segment = lowpass_signal[r_index[i]-16:r_index[i + 1]+20]
+                            ax.plot(segment,color='blue')
+                            ax.axis(False)
+                            fig.canvas.draw()
+                            data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+                            data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+                            image = Image.fromarray(data)
+                            resized_image = image.resize((360, 720), Image.LANCZOS)
+                            tensor_image = tf.convert_to_tensor(np.array(resized_image), dtype=tf.float32)
+                            plt.close(fig)
+                            
+                            predictions,ids = prediction_model_PAC(tensor_image)
+                            if str(ids) == "PAC" and float(predictions[3])>0.90: # 0.91
+                                updated_union.append(1)
+                                junc_union.append(0)
+                                pac_detect.append((int(r_index[i]), int(r_index[i+1])))
+                            elif (str(ids) == "Junctional" and float(predictions[1])>0.80) and R_label == 'Regular' and lead in ['I','II', 'III']:
+                                junc_union.append(1)
+                                updated_union.append(0)
+                                junc_detect.append((int(r_index[i]), int(r_index[i+1])))
+                            else:
+                                updated_union.append(0)
+                                junc_union.append(0)
+                        if len(r_index) != 0:
+                            junc_count = junc_union.count(1)
+                            if junc_count / len(r_index) >= 0.5 and hr <= 60:
+                                junctional_label = "Junctional_Rhythm" if hr > 40 else "Junctional_Bradycardia"
+                    except Exception as e:
+                        print(e)
+                        updated_union=[0,0,0,0,0,0,0,0]
+                        junc_union = [0,0,0,0,0,0,0,0]
+                    pac_data = self.pac_count_find(updated_union, hr)
+                    pac_label = '; '.join([key.split('_')[0] for key, val in pac_data.items() if 'counter' in key and val > 0]) 
+                    lead_data['updated_union'] = updated_union
+                    lead_data['junc_union'] = junc_union
+                    lead_data['junctional_label'] = junctional_label
+                    lead_data['pac_label'] = pac_label
+                    lead_data['pac_detect'] = pac_detect
+                    lead_data['junc_detect'] = junc_detect
+                    lead_data['pac_counts'] = pac_data
+                    lead_data['variations'] = variations
+                    all_lead_pac_data[lead] = lead_data
+        if all_lead_pac_data:
+            if len(all_lead_pac_data.keys()) > 1:
+                results_pac = {}
+                combined_labels = []
+                pvc_final_label, jnc_label = 'Abnormal', 'Abnormal'
+                for data in all_lead_pac_data.values():
+                    temp_label = data['pac_label'].split('; ')
+                    if len(temp_label) > 1:
+                        combined_labels.extend(temp_label)
+                    else:
+                        combined_labels.append(data['pac_label'])
+                    combined_labels.append(data['junctional_label'])
+                label_counts = Counter(combined_labels)
+                if self.is_lead == 8:
+                    rep_thresh = 2
+                else:
+                    rep_thresh = 1
+                repeated_elements = [item for item, count in label_counts.items() if count > rep_thresh]
+                
+                if 'SVT' in label_counts and label_counts['SVT'] != 3:
+                    repeated_elements.remove('PAC-SVT')
+                
+                if 'Junctional_Rhythm' in label_counts and label_counts['Junctional_Rhythm'] > rep_thresh:
+                    jnc_label = 'Junctional_Rhythm'
+                    if 'Junctional_Rhythm' in repeated_elements:
+                        repeated_elements.remove('Junctional_Rhythm')
+                elif 'Junctional_Bradycardia' in label_counts and label_counts['Junctional_Bradycardia'] > rep_thresh:
+                    jnc_label = 'Junctional_Bradycardia'
+                    if 'Junctional_Bradycardia' in repeated_elements:
+                        repeated_elements.remove('Junctional_Bradycardia')
+                is_pac_present = any(map(lambda x: 'PAC' in x, repeated_elements))
+                if is_pac_present and 'Abnormal' in repeated_elements:
+                    repeated_elements.remove('Abnormal')
+
+                pvc_final_label = ' '.join(repeated_elements)
+                pac_matching_keys, junc_matching_keys = [], []
+                pac_matching_keys = [
+                    key for key, data in all_lead_pac_data.items()
+                    if any(element in data['pac_label'] for element in repeated_elements)
+                ]
+                if pac_matching_keys:
+                    results_pac['pac_index'] = all_lead_pac_data[pac_matching_keys[0]]['pac_detect']
+                    results_pac['pac_union'] = all_lead_pac_data[pac_matching_keys[0]]['updated_union']
+                    results_pac['pac_counts']= all_lead_pac_data[pac_matching_keys[0]]['pac_counts']
+                    results_pac['variations'] = all_lead_pac_data[pac_matching_keys[0]]['variations']
+                else:
+                    results_pac['pac_index'] = []
+                    results_pac['pac_union'] = []
+                    results_pac['pac_counts'] = {}
+                    results_pac['variations'] = []
+                
+                results_pac['pac_label'] = pvc_final_label
+                results_pac['jnc_label'] = jnc_label
+                
+            else:
+                results_pac['pac_index'] = all_lead_pac_data['II']['pac_detect']
+                results_pac['pac_union'] = all_lead_pac_data['II']['updated_union']
+                results_pac['pac_label'] =all_lead_pac_data['II']['pac_label']
+                results_pac['jnc_label'] = all_lead_pac_data['II']['junctional_label']
+                results_pac['pac_counts']= all_lead_pac_data['II']['pac_counts']
+                results_pac['variations'] = all_lead_pac_data['II']['variations']
+        return results_pac
+   
+    def pac_count_find(self, PAC_R_Peaks, hr_counts):
+        svt_counter = 0
+        couplet_counter = 0
+        triplet_counter = 0
+        bigeminy_counter = 0
+        trigeminy_counter = 0
+        quadrigeminy_counter = 0
+        at = 0
+        i = 0
+        while i < len(PAC_R_Peaks):
+            count = 0
+            ones_count = 0
+            while i < len(PAC_R_Peaks) and PAC_R_Peaks[i] == 1:
+                count += 1
+                ones_count += 1
+                i += 1
+
+            if count >= 4:
+                svt_counter += 1
+                at += ones_count
+                count = 0
+                ones_count = 0
+            if count == 3:
+                triplet_counter += 1
+            elif count == 2:
+                couplet_counter += 1
+            i += 1
+        j = 0
+        while j < len(PAC_R_Peaks) - 1:
+            if PAC_R_Peaks[j] == 1:
+                k = j + 1
+                spaces = 0
+                while k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 0:
+                    spaces += 1
+                    k += 1
+
+                if k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 1:
+                    if spaces == 1:
+                        bigeminy_counter += 1
+                    elif spaces == 2:
+                        trigeminy_counter += 1
+                    elif spaces == 3:
+                        quadrigeminy_counter += 1
+                j = k
+            else:
+                j += 1
+
+        total_one = (1 * at) + (couplet_counter * 2) + (triplet_counter * 3) + (bigeminy_counter * 2) + (
+                trigeminy_counter * 2) + (quadrigeminy_counter * 2)
+        total = svt_counter + couplet_counter + triplet_counter + bigeminy_counter + trigeminy_counter + quadrigeminy_counter
+        ones = PAC_R_Peaks.count(1)
+
+        if total == 0:
+            Isolated = ones
+        else:
+            Common = total - 1
+            Isolated = ones - (total_one - Common)
+        if hr_counts > 100:
+            if svt_counter != 0:
+                triplet_counter = couplet_counter = quadrigeminy_counter = trigeminy_counter = bigeminy_counter = Isolated = 0
+        if svt_counter >= 1 and hr_counts > 100:  # 190
+            svt_counter = 1
+        else:
+            svt_counter = 0
+
+        data = {"PAC-Isolated_counter": Isolated,
+                "PAC-Bigem_counter": bigeminy_counter,
+                "PAC-Trigem_counter": trigeminy_counter,
+                "PAC-Quadrigem_counter": quadrigeminy_counter,
+                "PAC-Couplet_counter": couplet_counter,
+                "PAC-Triplet_counter": triplet_counter,
+                "SVT_counter": svt_counter}  # svt_counter
+        return data
+        
+def find_label_couter(labels_list):
+    flat_list = []
+    for element in labels_list:
+        if isinstance(element, list):
+            flat_list.extend(element)
+        else:
+            flat_list.append(element)
+    return flat_list
+
+class BlockDetected:
+    def __init__(self, ecg_signal, fs):
+        self.ecg_signal = ecg_signal
+        self.fs = fs
+        self.block_processing()
+
+    def block_processing(self):
+        self.baseline_signal, self.lowpass_signal = FilterSignal(self.ecg_signal, self.fs).get_data()
+        pqrst_data = PqrstDetection(self.baseline_signal, fs=self.fs).get_data()
+        self.r_index = pqrst_data["R_index"]
+        self.q_index = pqrst_data["Q_Index"]
+        self.s_index = pqrst_data["S_Index"]
+        self.p_index = pqrst_data["P_Index"]
+        self.hr_counts = pqrst_data["HR_Count"]
+        self.p_t = pqrst_data["P_T List"]
+        self.pr = pqrst_data["PR_Interval"]
+
+    def third_degree_block_deetection(self):
+        label = 'Abnormal'
+        third_degree = []
+        possible_mob_3rd = False
+        if self.hr_counts <= 100 and len(self.p_t) != 0:  # 60 70
+            constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
+            cons_2_1 = all(len(inner_list) in {1, 2} for inner_list in self.p_t)
+            ampli_val = list(
+                map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list),
+                    self.p_t))
+            count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
+            percentage_above_threshold = count_above_threshold / len(ampli_val)
+            count = 0
+            if percentage_above_threshold >= 0.7:
+                inc_dec_count = 0
+                for i in range(0, len(self.pr)):
+                    if self.pr[i] > self.pr[i - 1]:
+                        inc_dec_count += 1
+                if len(self.pr) != 0:
+                    if round(inc_dec_count / (len(self.pr)), 2) >= 0.50:  # if posibale to change more then 0.5
+                        possible_mob_3rd = True
+               
+                for inner_list in self.p_t:
+                    if len(inner_list) in [3, 4]:
+                        ampli_val = [self.baseline_signal[i] for i in inner_list]
+                        if ampli_val and (sum(value > 0.05 for value in ampli_val) / len(ampli_val)) > 0.7:
+                            differences = np.diff(inner_list).tolist()
+                            diff_list = [x for x in differences if x >= 70]
+                            if len(diff_list) != 0:
+                                third_degree.append(1)
+                            else:
+                                third_degree.append(0)
+                    elif len(inner_list) in [3, 4] and possible_mob_3rd == True and constant_2 == False:
+                        differences = np.diff(inner_list).tolist()
+                        if all(diff > 70 for diff in differences):
+                            third_degree.append(1)
+                        else:
+                            third_degree.append(0)
+                    else:
+                        third_degree.append(0)
+        if len(third_degree) != 0:
+            if third_degree.count(1) / len(third_degree) >= 0.4 or possible_mob_3rd:  # 0.5 0.4
+                label = "3rd Degree block"
+        return label
+
+    def second_degree_block_detection(self):
+        label = 'Abnormal'
+        constant_3_peak = []
+        possible_mob_1 = False
+        possible_mob_2 = False
+        mob_count = 0
+        if self.hr_counts <= 100:  # 80
+            if len(self.p_t) != 0:
+                constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
+                rhythm_flag = all(len(inner_list) in {1, 2, 3} for inner_list in self.p_t)
+                ampli_val = list(
+                    map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list),
+                        self.p_t))
+                count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
+                percentage_above_threshold = count_above_threshold / len(ampli_val)
+                if percentage_above_threshold >= 0.7:
+                    if rhythm_flag and constant_2 == False:
+                        pr_interval = []
+                        for i, r_element in enumerate(self.r_index[1:], start=1):
+                            if i <= len(self.p_t):
+                                inner_list = self.p_t[i - 1]
+                                last_element = inner_list[-1]
+                                result = r_element - last_element
+                                pr_interval.append(result)
+
+                        counts = {}
+                        count_2 = 0
+                        for i in range(0, len(pr_interval)):
+                            counts[i] = 1
+                            if i in counts:
+                                counts[i] += 1
+                            if pr_interval[i] > pr_interval[i - 1]:
+                                count_2 += 1
+                        most_frequent = max(counts.values())
+                        if round(count_2 / (len(pr_interval)), 2) >= 0.50:
+                            possible_mob_1 = True
+                        elif round(most_frequent / len(pr_interval), 2) >= 0.4:
+                            possible_mob_2 = True
+
+                        for inner_list in self.p_t:
+                            if len(inner_list) == 3:
+                                differences = np.diff(inner_list).tolist()
+                                if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
+                                    if possible_mob_1 or possible_mob_2:
+                                        mob_count += 1
+                                    else:
+                                        constant_3_peak.append(1)
+                            else:
+                                constant_3_peak.append(0)
+                    else:
+                        for inner_list in self.p_t:
+                            if len(inner_list) == 3:
+                                differences = np.diff(inner_list).tolist()
+                                if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
+                                    constant_3_peak.append(1)
+                                else:
+                                    constant_3_peak.append(0)
+                            else:
+                                constant_3_peak.append(0)
+        if len(constant_3_peak) != 0 and constant_3_peak.count(1) != 0:
+            
+            if constant_3_peak.count(1) / len(constant_3_peak) >= 0.4:  # 0.4 0.5
+                label = "Mobitz_II"
+        elif possible_mob_1 and mob_count > 1:  # 0 1 4
+            label = "Mobitz_I"
+        elif possible_mob_2 and mob_count > 1:  # 0  4
+            label = "Mobitz_II"
+        return label
+
+    
+    # Block new trans model for added 
+    def prediction_model_block(self, input_arr, block_model):
+        classes = ['1st_deg', '2nd_deg', '3rd_deg', 'abnormal', 'normal']
+        input_arr = tf.io.decode_jpeg(tf.io.read_file(input_arr), channels=3)
+        input_arr = tf.image.resize(input_arr, size=(224, 224), method=tf.image.ResizeMethod.BILINEAR)
+        input_arr = (tf.expand_dims(input_arr, axis=0),)
+        model_pred = predict_tflite_model(block_model, input_arr )[0]
+        idx = np.argmax(model_pred)
+        return model_pred, classes[idx]
+    
+    def check_block_model(self,low_ecg_signal, block_model):
+        label = 'Abnormal'
+        for i in glob.glob('temp_block_img' + "/*.jpg"):
+            os.remove(i)
+        
+        randome_number = random.randint(200000, 1000000)
+        temp_img = low_ecg_signal
+        plt.figure()  # layout="constrained", dpi=300
+        plt.plot(temp_img)
+        plt.axis("off")
+        plt.savefig(f"temp_block_img/p_{randome_number}.jpg")
+        aq = cv2.imread(f"temp_block_img/p_{randome_number}.jpg")
+        aq = cv2.resize(aq, (2400,360)) #1080, 460
+        cv2.imwrite(f"temp_block_img/p_{randome_number}.jpg", aq)
        
+        plt.close()
+        ei_ti_label, predictions = [], []
+        files = sorted(glob.glob("temp_block_img/*.jpg"), key=extract_number)
+        for pvcfilename in files:
+            predictions, ids = self.prediction_model_block(pvcfilename, block_model)
+            # print(predictions, ids)
+            label = "Abnormal" #"Normal"
+            if str(ids) == "3rd_deg" and float(predictions[2]) > 0.80:
+                label = "3rd degree"
+            if str(ids) == "2nd_deg" and float(predictions[1]) > 0.80:
+                label = "2nd degree"
+            if str(ids) == "1st_deg" and float(predictions[0]) > 0.80:
+                label = "1st degree"
+
+            if 0.40 < float(predictions[1]) < 0.70:
+                ei_ti_label.append('2nd degree')
+            if 0.40 < float(predictions[0]) < 0.70:
+                ei_ti_label.append('1st degree')
+            if 0.40 < float(predictions[2]) < 0.70:
+                ei_ti_label.append('3rd degree')
+        return label, ei_ti_label, predictions
+
+def block_model_check(ecg_signal, frequency, abs_result, block_model):
+    model_label = 'Abnormal'
+    ei_ti_block = []
+    baseline_signal = baseline_construction_200(ecg_signal)
+    lowpass_signal = lowpass(baseline_signal)
+    get_block = BlockDetected(ecg_signal, frequency)
+    block_result, ei_ti_label, model_pre = get_block.check_block_model(lowpass_signal, block_model)
+    if block_result == '1st degree' and abs_result != 'Abnormal':
+        model_label = 'I DEGREE'
+    if block_result == '2nd degree' and (abs_result == '' or abs_result == 'Mobitz II' or abs_result == 'Mobitz I'):
+        if abs_result=="Mobitz I":
+            model_label = 'MOBITZ-I'
+        if abs_result=="Mobitz II":
+            model_label = 'MOBITZ-II'
+    if block_result == '3rd degree' and abs_result == "3rd Degree block": #abs_result!="Abnormal":
+        model_label = 'III Degree'
+    if abs_result in ['1st deg. block', "3rd Degree block", 'Mobitz II', 'Mobitz I']:
+        if block_result == '2nd degree':
+            model_label = 'MOBITZ-I'
+        elif block_result == '3rd degree':
+            model_label = 'III Degree'
+    if ei_ti_label:
+        if '1st degree' in ei_ti_label and abs_result!="Abnormal":
+            model_label = 'I DEGREE'
+            ei_ti_block.append({"Arrhythmia":"I DEGREE","percentage":model_pre[0]*100})
+        if '2nd degree' in ei_ti_label and (abs_result == 'Mobitz I' or abs_result == 'Mobitz II'):
+            if abs_result=="Mobitz I":
+                model_label = 'MOBITZ-I'
+                ei_ti_block.append({"Arrhythmia":"MOBITZ-I","percentage":model_pre[1]*100})
+            if abs_result=="Mobitz II":
+                model_label = 'MOBITZ-II'
+                ei_ti_block.append({"Arrhythmia":"MOBITZ-II","percentage":model_pre[1]*100})
+        if '3rd degree' in ei_ti_label and abs_result!="Abnormal":
+            model_label = 'III Degree'
+            ei_ti_block.append({"Arrhythmia":"III Degree","percentage":model_pre[2]*100})
+    return model_label, ei_ti_block
+
+def block_detection_processing(all_lead_data, is_lead=2,  fs=200):
+    print("----------------- block_detection_processing -------------------")
+    block_label, ei_ti_label = 'Abnormal', 'Abnormal'
+       
+    all_lead_result_data= {}
+    all_block_labels, all_ei_ti_laels = [], []
+    if is_lead == 5:
+        analysis_lead = ['I', 'II', 'III']
+        rep_thresh = 2
+    elif is_lead == 8:
+        analysis_lead = ['I', 'II', 'III', 'v1', 'v5']
+        rep_thresh = 1
+    else:
+        analysis_lead = ['I']
+    if len(all_lead_data) != 0:
+        for lead in all_lead_data.keys():
+            lead_data = {}
+            
+            model_label = 'Abnormal'
+            if lead in analysis_lead:
+                ecg_signal = all_lead_data[lead]
+                frequency = 200
+                baseline_signal = baseline_construction_200(ecg_signal, 101)
+                lowpass_signal = lowpass(baseline_signal)
+                abs_result = 'Abnormal'
+                # if abs_result == 'Abnormal':
+                second_deg_block = BlockDetected(ecg_signal, frequency).second_degree_block_detection()
+                if second_deg_block != 'Abnormal':
+                    abs_result = second_deg_block
+                if abs_result == 'Abnormal':
+                    third_deg_block = BlockDetected(ecg_signal, frequency).third_degree_block_deetection()
+                    if third_deg_block != 'Abnormal':
+                        abs_result = third_deg_block
+                model_label, ei_ti_block = block_model_check(ecg_signal, frequency, abs_result, block_load_model)
+                if model_label != 'Abnormal':
+                    abs_result = model_label
+                    
+                lead_data['block_label'] = model_label
+                lead_data['ei_ti_block'] = ei_ti_block
+                all_block_labels.append(model_label)
+                all_lead_result_data[lead] = lead_data
+        if len(all_lead_result_data) > 1:
+            if all_block_labels:
+                labels_result = find_label_couter(all_block_labels)
+                counts = Counter(labels_result)
+                repeated_elements = [item for item, count in counts.items() if count > rep_thresh]
+                block_label = ' '.join(repeated_elements)
+            if all_ei_ti_laels:
+                ei_ti_labels_result = find_label_couter(all_ei_ti_laels)
+                et_count = Counter(ei_ti_labels_result)
+                find_repeated = [item for item, count in et_count.items() if count > rep_thresh]
+                ei_ti_label = ' '.join(find_repeated)
+        else:
+            block_label = all_lead_result_data['II']['block_label']
+            ei_ti_label = all_lead_result_data['II']['ei_ti_block']
+    
+    result_dic = {
+        'block_label': block_label,
+        'ei_ti_label': ei_ti_label
+    }
+    return result_dic
+  
 def subscribe(client):
     while True:
         item = queue.pop()
@@ -4166,8 +4876,6 @@ def subscribe(client):
                 start = time.time()
                 dd = item
                 rawdata = dd["data"]
-                
-                
                 try:
                     if dd["version"] == 2:
                         valueOfData = 23
@@ -4180,10 +4888,6 @@ def subscribe(client):
                     
                 grouped_data = [rawdata[i:i + valueOfData] for i in range(0, len(rawdata), valueOfData)]
                 for group in grouped_data:
-#                    try:
-#                      print(len(group))
-#                    except Exception as e:
-#                      print(e)
                     filtered_data = []
                     seconddata = group
                     for i in range(1, len(group)): 
@@ -4255,7 +4959,6 @@ def subscribe(client):
                             except:
                               print("rpmId not getting...")
                               pass
-    ##                        versionList.append(dd['data'][i]['version'])
                             try:
                               patientData = dd['patientData']
                             except:
@@ -4289,9 +4992,7 @@ def subscribe(client):
                               print("sysncDataReaming not getting...")
                               pass                         
                          
-                            #version = dd['version']
                         except Exception as e:
-                            #print(e)
                             pass
                         
                         try:
@@ -4303,10 +5004,6 @@ def subscribe(client):
 
                         datetimee.append(seconddata[i]['dateTime']) 
                         newlist.append(seconddata[i]['data'])
-##                        try:
-##                            newlist1.append(seconddata[i]['data1'])  
-##                        except:
-##                            pass
                         leadlist.append(seconddata[i]['lead'])
                     allstring = ''.join(newlist)
                     print("DATALENGHT:",datalength)  
@@ -4343,7 +5040,13 @@ def subscribe(client):
                         OriginalSignal = [float(s) for s in vol]
                         OriginalSignal = MinMaxScaler(feature_range=(0,4)).fit_transform(np.array(OriginalSignal).reshape(-1,1)).squeeze()
                         ecgdata = pd.DataFrame({"ECG":OriginalSignal})
-                        final_output = noise_engine(flag = "200",ecgdata=ecgdata)
+                        fs = 200
+                        all_lead_data = {}
+                        if int(version) == 5 or int(version) == 8:
+                            all_lead_data = data_convert_MI(sorted_data, int(version))
+                        elif int(version) == 2:
+                            all_lead_data = pd.DataFrame({'II': OriginalSignal})
+                        final_output = noise_engine(all_lead_data, int(version))
 
                         mintime = min(datetimee)
                         maxtime = max(datetimee)
@@ -4375,7 +5078,6 @@ def subscribe(client):
                                 print("LOG:",result_data)
                                 client.publish(topic_y,json.dumps(result_data),qos=2)
                                 
-        ##                        item = queue.pop()
                             elif dd['ecgPackage']=="Free":
                                 print("Free")
                                 try:
@@ -4459,21 +5161,6 @@ def subscribe(client):
                                         beatss = int(int(HR)/4)
                                     except:
                                         beatss = 0
-    ##                                aped=[]
-    ##                                for i in range(len(rpeaks)-1):
-    ##                                    m=rpeaks[i+1]-rpeaks[i]
-    ##                                    aped.append(m*5/1000)
-    ##
-    ##                                variation=[]
-    ##                                rrint=''
-    ##                                for i in range(len(aped)-1):
-    ##                                    
-    ##                                    variation.append(get_percentage_diff(aped[i+1],aped[i]))
-    ##                                
-    ##                                if Average(variation)>12:
-    ##                                    rrint = "IRREGULAR"
-    ##                                else:
-    ##                                    rrint = "REGULAR"
                                     rrint = rrirrAB(rpeaks)
                                     finddata=[]
                                     try:
@@ -4481,10 +5168,7 @@ def subscribe(client):
                                     except:
                                         result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':positionFinal,"beats":len(rpeaks),"RRInterval":str(0),"PRInterval":str(0),"QTInterval":str(0),"QRSComplex":str(0),"STseg":str(0),"PRseg":str(0),"noOfPause":0,"noOfPauseList":[],"ecgPackage":allarr,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"offline":True,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
 
-
                                     noise_cc = noise_check_again(naa)
-
-                                        
                                     if int(HR)<60 and noise_cc == "Normal":
                                         rpeakss = hamilton_segmenter(signal = naa)["rpeaks"]
                                         timetakens = round((np.sum(np.diff(datetimee))+500)/1000)
@@ -4549,21 +5233,13 @@ def subscribe(client):
                                     print("LOG5:",result_data,e)
                                     client.publish(topic_y,json.dumps(result_data),qos=2)
 
-
-
                             else:
-    ##                            if isinstance(final_output, type(None)) or isinstance(final_output, str):
-    ##                                pass
-    ##                            elif len(final_output)==2 and int(timetaken)>=5 and int(timetaken)<=20:
-    ##                                pass
-    ##
-    ##                            else:
                                 try:
                                     naa = np.array(OriginalSignal)
                                 except:
                                     naa = np.array(OriginalSignal)
                                 # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
-                                final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
+                                final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
 
                                 if final_label == "VFIB/Vflutter":
                                         na = np.array(OriginalSignal)
@@ -4592,7 +5268,6 @@ def subscribe(client):
                                                 result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                                 print("LOG:",result_data)
                                                 client.publish(topic_y,json.dumps(result_data),qos=2)
-            ##                                    item = queue.pop()
                                             else:
                                                 result_data = [{"patient":dd["patient"],"HR":int(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'VFIB','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                                 print("LOG:",result_data)
@@ -4600,74 +5275,66 @@ def subscribe(client):
                                                     x = mycol.insert_one(dict(i))
 
                                                 client.publish(topic_y,json.dumps(result_data),qos=2)
-            ##                                    item = queue.pop()
                                         except:
-                                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                                print("LOG:",result_data)
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
+                                            print("LOG:",result_data)
+                                            client.publish(topic_y,json.dumps(result_data),qos=2)
 
 
                                 elif final_label == "ASYS" and int(timetaken)>=5:
-                                        mintime = min(datetimee)
-                                        maxtime = max(datetimee)
-                                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'ASYSTOLE','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                        print("LOG:",result_data)
-                                        for i in result_data:
-                                            x = mycol.insert_one(dict(i))
+                                    mintime = min(datetimee)
+                                    maxtime = max(datetimee)
+                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'ASYSTOLE','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                    print("LOG:",result_data)
+                                    for i in result_data:
+                                        x = mycol.insert_one(dict(i))
 
-                                        client.publish(topic_y,json.dumps(result_data),qos=2)
-        ##                                item = queue.pop()
-
+                                    client.publish(topic_y,json.dumps(result_data),qos=2)
                                 elif final_label == "Noise":
-                                        print("VFIB Model Noise")
-                                        mintime = min(datetimee)
-                                        maxtime = max(datetimee)
+                                    print("VFIB Model Noise")
+                                    mintime = min(datetimee)
+                                    maxtime = max(datetimee)
+                                    try:
+                                        na = np.array(OriginalSignal)
+                                        rpeaks = detect_beats(na, float(200))
+                                        beats = []
+                                        for nnn in rpeaks:
+                                            beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+
                                         try:
-                                            na = np.array(OriginalSignal)
-                                            rpeaks = detect_beats(na, float(200))
-                                            beats = []
-                                            for nnn in rpeaks:
-                                                    beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+                                            br,hrv = BPM(rpeaks)
+                                        except:
+                                            br,hrv = 0,[]
 
-                                            try:
-                                                br,hrv = BPM(rpeaks)
-                                            except:
-                                                br,hrv = 0,[]
-
-
-                                            HR = int(60*int(len(rpeaks))/(timetaken))
-                                            if HR>60 and HR<100:
-                                                if int(version) == 5:
-                                                    label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
-                                                    if label_rlbbb=="LBBB":
-                                                        result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                        print("LOG:",result_data)
-                                                        client.publish(topic_y,json.dumps(result_data),qos=2)
-                                                    elif label_rlbbb=="RBBB":
-                                                        result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                        print("LOG:",result_data)
-                                                        client.publish(topic_y,json.dumps(result_data),qos=2)
-                                                    else:
-                                                        result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                        print("LOG:",result_data)
-                                                        client.publish(topic_y,json.dumps(result_data),qos=2)
+                                        HR = int(60*int(len(rpeaks))/(timetaken))
+                                        if HR>60 and HR<100:
+                                            if int(version) == 5:
+                                                label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
+                                                if label_rlbbb=="LBBB":
+                                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                                    print("LOG:",result_data)
+                                                    client.publish(topic_y,json.dumps(result_data),qos=2)
+                                                elif label_rlbbb=="RBBB":
+                                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                                    print("LOG:",result_data)
+                                                    client.publish(topic_y,json.dumps(result_data),qos=2)
                                                 else:
                                                     result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                                     print("LOG:",result_data)
                                                     client.publish(topic_y,json.dumps(result_data),qos=2)
-
                                             else:
-                                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                                result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                                 print("LOG:",result_data)
                                                 client.publish(topic_y,json.dumps(result_data),qos=2)
-        ##                                        item = queue.pop()
-                                                
 
-                                        except:
+                                        else:
                                             result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                             print("LOG:",result_data)
                                             client.publish(topic_y,json.dumps(result_data),qos=2)
-        ##                                    item = queue.pop()
+                                    except:
+                                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                        print("LOG:",result_data)
+                                        client.publish(topic_y,json.dumps(result_data),qos=2)
 
                                 else:
                                     try:
@@ -4681,14 +5348,15 @@ def subscribe(client):
                                         newdada = aboutdata["ECG"]
                                         naa = np.array(newdada)
 
+                                        # 2, 7, 12 lead according r peak detection
+                                        rpeaks = check_r_index(all_lead_data, fs, int(version))
+                                        s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
                                         rrint=''
                                         fa=200
-                                        rpeaks = detect_beats(newdada, float(fa))
+                                        # rpeaks = detect_beats(newdada, float(fa))
                                         beats = []
                                         for nnn in rpeaks:
-                                                beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
-
-
+                                            beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
                                         try:
                                             br,hrv = BPM(rpeaks)
                                         except:
@@ -4700,8 +5368,8 @@ def subscribe(client):
                                         low_es = lowpass(b_es)
                                         r = list(r_index)
                                         r_index = np.array(r)
-                                        s_index = find_s_indexs(b_es,r_index,20)
-                                        q_index = find_q_indexs(b_es, r_index, 15)
+                                        # s_index = find_s_indexs(b_es,r_index,20)
+                                        # q_index = find_q_indexs(b_es, r_index, 15)
                                         j_index = find_j_indexs(b_es,s_index)
                                         wideqrs=[]
                                         for iii in range(len(q_index)-1):
@@ -4737,32 +5405,14 @@ def subscribe(client):
                                         p_t1 = []
                                         pt, p_t = find_p_t(low_es, r_index, q_index, s_index)
                                         try:
-                                          try:
-                                              _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
-                                              signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="dwt")
-                                          except Exception as rr:
-                                              _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
-                                              signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="cwt")
+                                            try:
+                                                _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
+                                                signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="dwt")
+                                            except Exception as rr:
+                                                _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
+                                                signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="cwt")
                                         except Exception as ee:
-                                              print("neurokit2 Error:",ee)
-    ##                                    aped=[]
-    ##                                    for i in range(len(rpeaks)-1):
-    ##                                        m=rpeaks[i+1]-rpeaks[i]
-    ##                                        aped.append(m*5/1000)
-    ##
-    ##
-    ##
-    ##
-    ##                                    varitionforAFib=[]
-    ##
-    ##                                    for i in range(len(aped)-1):
-    ##                                        
-    ##                                        varitionforAFib.append(get_percentage_diff(aped[i+1],aped[i]))
-    ##                                    if Average(varitionforAFib)>=12:
-    ##                                        rrint = "IRREGULAR"
-    ##                                    else:
-    ##                                        rrint = "REGULAR"
-                                        # print(rrint)
+                                            print("neurokit2 Error:",ee)
                                         rrint = rrirrAB(rpeaks)
                                         RRintervallist = []
                                         for i in rpeaks:
@@ -4830,10 +5480,6 @@ def subscribe(client):
                                         except:
                                             PRseg = "0"
 
-
-
-
-
                                         pvc = ''
                                         afib = ''
                                         var=''
@@ -4860,26 +5506,8 @@ def subscribe(client):
                                             print(e)
                                             result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':0,"beats":len(rpeaks),"RRInterval":str(0),"PRInterval":str(0),"QTInterval":str(0),"QRSComplex":str(0),"STseg":str(0),"PRseg":str(0),"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"noOfPauseList":[],"ecgPackage":"All-Arrhythmia","trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"threeLatter":[],"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
 
-
-
-
-
-
                                         naaaaa = np.array(newdada)
                                         r_index_s = find_r_peakss(naaaaa,fs=200)
-    ##                                    apeds=[]
-    ##                                    for i in range(len(r_index_s)-1):
-    ##                                        ma=r_index_s[i+1]-r_index_s[i]
-    ##                                        apeds.append(ma*5/1000)
-    ##                                    varitionforAFibs=[]
-    ##                                    for i in range(len(apeds)-1):
-    ##                                        varitionforAFibs.append(get_percentage_diff(apeds[i+1],apeds[i]))
-    ##
-    ##                                    if Average(varitionforAFibs)>=9:
-    ##                                        rrints = "IRREGULAR"
-    ##                                    else:
-    ##                                        rrints = "REGULAR"
-            ##                            print(Average(varitionforAFibs),rrints,rrint)
                                         rrints = rrirrAB(r_index_s)
                                         if int(timetaken)>6:
                                             try:
@@ -4908,14 +5536,6 @@ def subscribe(client):
                                                                     result_data["threeLatter"].append(ei_ti_afib_afl)
                                                             d4 = result_data
                                                             finddata.append(d4)
-                                                    
-                                                        # if (newafib == "Afib" or newafib == "Aflutter") and int(HR)<65:
-                                                        #     result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":str(HR)})
-                                                        #     for ei_ti_afib_afl in ei_ti:
-                                                        #         result_data["threeLatter"].append(ei_ti_afib_afl)
-                                                        #     d4 = result_data
-                                                        #     finddata.append(d4)
-    
                                                         if newafib == "Abnormal":
                                                             result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":str(HR)})
                                                             d4 = result_data
@@ -4949,10 +5569,6 @@ def subscribe(client):
                                             result_data.update({"Arrhythmia":'TC'})
                                             d2 = result_data
                                             finddata.append(d2)
-
-
-
-
 
                                         if (SACompare(SAf, 3000)):
                                             l=[]
@@ -5001,350 +5617,53 @@ def subscribe(client):
 
                                         layer2 = newpvcs
                                         if 1 in layer2:
-                                            lis=[]
-                                            count=1
-                                            pvc_data = lowpass_1(b_es)
-                                            aboutdatas = pd.DataFrame(pvc_data)
-                                            for i in rpeaks:
-                                                lis.append(i)
-
-                                                if i == rpeaks[0]:
-                                                    count += 1
-                                                    lis.append(i)
-                                                    try:
-                                                        window_start = int(lis[0]) - 10
-                                                    except:
-                                                        window_start = int(lis[0]) - 20
-                                                    window_end = int(lis[0]) + 100
-                                                elif i == rpeaks[1]:
-                                                    count += 1
-                                                    lis.append(i)
-                                                    window_start = int(lis[0]) - 50
-                                                    window_end = int(lis[0]) + 130
-                                                else:
-                                                    count += 1
-                                                    lis.append(i)
-                                                    window_start = int(lis[0]) - 50
-                                                    window_end = int(lis[0]) + 80
-
-                                                aa = pd.DataFrame(aboutdatas.iloc[window_start:window_end])
-        ##                                        plt.ion()
-                                                plt.plot(aa,color='blue')
-                                                plt.axis("off")
-                                                plt.savefig(f"{imageresource}/p_{int(lis[0])}.jpg")
-                                                aq = cv2.imread(f"{imageresource}/p_{int(lis[0])}.jpg")
-                                                aq = cv2.resize(aq, (360, 720))
-                                                cv2.imwrite(f"{imageresource}/p_{int(lis[0])}.jpg", aq)
-                                                lis.clear()
-                                                #plt.pause(0.01)
-                                                plt.close()
-        ##                                        plt.ioff()
-
-
-                                            
-                                            observer = []
-                                            mainpick = []
-                                            newdatepvclist=[]
-                                            patientid = dd["patient"]
                                             if os.path.exists("pvcs/"+patientid):
                                                 pass
                                             else:
                                                 os.mkdir("pvcs/"+patientid)
-
-        ##                                    files = sorted(glob.glob(imageresource+"/*.jpg"), key=len)
-                                            files = sorted(glob.glob(imageresource+"/*.jpg"), key=sorting_key)
-                                            for pvcfilename in files:
-                                              predictions,ids = prediction_model(pvcfilename)
-                                              if str(ids) == "PVC" and float(predictions[3])>0.92:
-                                                  observer.append(1)
-                                                  mainpick.append(int(pvcfilename.split("_")[1].split(".jpg")[0]))
-                                                  datetimeapp = int(date_time[int(pvcfilename.split("_")[1].split(".jpg")[0])])
-                                                  shutil.copy(pvcfilename,"pvcs/"+patientid+"/"+"p_"+str(pvcfilename.split("_")[1].split(".jpg")[0]+"_"+str(datetimeapp)+".jpg"))
-                                              else:
-                                                  observer.append(0)
-                                                  
+                                            pvc_r_index = check_r_index(all_lead_data, fs, int(version))
+                                            pvc_detection_result = PVCDetection(all_lead_data, fs, pvc_r_index, date_time, patientid, is_lead=int(version)).get_pvc_data()
+                                            peaksdefined, observer= [], []
+                                            pvc_label = ""
+                                            pvc_counts = {}
+                                            if 'newdatepvclist' in pvc_detection_result:
+                                                peaksdefined = pvc_detection_result['newdatepvclist']
+                                            if 'observer' in pvc_detection_result:
+                                                observer = pvc_detection_result['observer']
+                                            if 'pvc_label' in pvc_detection_result:
+                                                pvc_label = pvc_detection_result['pvc_label']
+                                            if 'pvc_counts' in pvc_detection_result:
+                                                pvc_counts = pvc_detection_result['pvc_counts']
                                             
-                                            for nnn in mainpick:
-                                                newdatepvclist.append(str(date_time[nnn]))
-                                            peaksdefined = newdatepvclist
-                                            bb = observer
-                                            actaulPVC = observer
-                                            bigem = []
-                                            bigem_count= 0
-                                            for q,k in enumerate(bb):
-                                                if len(bigem) == 3:
-                                                    bigem_count+=1
-                                                    try:
-                                                        if bb[q] ==0 and bb[q+1]==1:
-                                                            bigem.clear()
-                                                            bigem.append(1)
-                                                        else:
-                                                            bigem.clear()
-                                                    except:
-                                                        bigem.clear()
-
-
-                                                if len(bigem ) ==0 and k ==1:
-                                                    bigem.append(1)
-                                                elif len(bigem) ==1 and k ==0:
-
-                                                    bigem.append(0)
-                                                elif len(bigem) ==2 and k ==1:
-                                                    bigem.append(1)
-                                                else:
-                                                    if len(bigem)==1 and (1 in bigem) and k==1:
-                                                        bigem.clear()
-                                                        bigem.append(1)
-                                                    elif len(bigem)>1: 
-                                                        bigem.clear()
-                                                        if k ==1:
-                                                            bigem.append(1)
-                                                        
-                                                        
-                                            if len(bigem) == 3:
-                                                bigem_count+=1
-                                                bigem.clear()
-
-
-
-                                            # Trigeminy 
-
-
-                                            Trigem = []
-                                            Trigem_count = 0
-                                            for m,l in enumerate(bb):
-                                                if len(Trigem) == 4:
-                                                    Trigem_count+=1
-                                                    try:
-                                                        if bb[m] ==0 and bb[m+1]==0 and bb[m+2]==1:
-                                                            Trigem.clear()
-                                                            Trigem.append(1)
-                                                        else:
-                                                            Trigem.clear()
-                                                    except:
-                                                        Trigem.clear()
-
-                                                if len(Trigem) ==0 and l ==1:
-                                                    Trigem.append(1)
-                                                elif len(Trigem) ==1 and l ==0:
-
-                                                    Trigem.append(0)
-                                                elif len(Trigem) ==2 and l ==0:
-                                                    Trigem.append(0)
-                                                elif len(Trigem) ==3 and l ==1:
-                                                    Trigem.append(1)
-                                                else:
-                                                    if len(Trigem)==1 and (1 in Trigem) and l==1:
-                                                        Trigem.clear()
-                                                        Trigem.append(1)
-                                                    elif len(Trigem)>1: 
-                                                        Trigem.clear()
-                                                        if l ==1:
-                                                            Trigem.append(1)
-                                            if len(Trigem) == 4:
-                                                Trigem_count+=1
-                                                Trigem.clear()
-
-
-                                            # Quadrageminy
-
-
-                                            Quadgem = []
-                                            Quadgem_count = 0
-                                            for p,o in enumerate(bb):
-                                                if len(Quadgem) == 5:
-                                                    Quadgem_count+=1
-                                                    try:
-                                                        if bb[p] ==0 and bb[p+1]==0 and bb[p+2]==0 and bb[p+3]==1:
-                                                            Quadgem.clear()
-                                                            Quadgem.append(1)
-                                                        else:
-                                                            Quadgem.clear()
-                                                    except:
-                                                        Quadgem.clear()
-
-
-                                                if len(Quadgem) ==0 and o ==1:
-                                                    Quadgem.append(1)
-                                                    
-                                                elif len(Quadgem) ==1 and o ==0:
-
-                                                          
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==2 and o ==0:
-                                                    
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==3 and o ==0:
-                                                    
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==4 and o ==1:
-                                                   
-                                                    Quadgem.append(1)
-                                                else:
-                                                    if len(Quadgem)==1 and (o in Quadgem) and o==1:
-                                                        Quadgem.clear()
-                                                        Quadgem.append(1)
-                                                    elif len(Quadgem)>1: 
-                                                    
-                                                        Quadgem.clear()
-                                                        if o ==1:
-                                                            Quadgem.append(1)
-                                            if len(Quadgem) == 5:
-                                                Quadgem_count+=1
-                                                Quadgem.clear()
-
-                                            ll=bb
-                                            couplet = []
-                                            c_count=0
-                                            for i in ll:
-                                                if i==1:
-                                                    couplet.append(1)
-                                                    if len(couplet)==3:
-                                                        c_count-=1
-                                                        couplet.clear()
-
-                                                    if len(couplet)==2: 
-                                                        c_count+=1
-                                                        
-                                                    if 0 in couplet:
-                                                        if c_count==0:
-                                                            pass
-                                                        else:
-                                                            c_count-=1
-                                                        couplet.clear()
-                                                else:
-                                                    couplet.clear()
-
-                                                        
-                                            triplet = []
-                                            t_count=0
-                                            for i in ll:
-                                                if i==1:
-                                                    triplet.append(1)
-                                                    if len(triplet)>=4:
-                                                        t_count-=1
-                                                        triplet.clear()
-                                                    if len(triplet)==3:
-                                                        t_count+=1
-
-                                                    if 0 in triplet:
-                                                        if t_count==0:
-                                                            pass
-                                                        else:
-                                                            t_count-=1
-                                                        triplet.clear()
-                                                        
-                                                else:
-                                                    triplet.clear()
-
-
-                                            if int(HR)>100:
-                                                vt = []
-                                                vt_count=0
-                                                for i in ll:
-                                                    if i==1:
-                                                        vt.append(1)
-                                                        if len(vt)>=4:
-                                                            vt_count+=1
-                                                            vt.clear()
-                                                        if 0 in vt:
-                                                            if vt_count==0:
-                                                                pass
-                                                            else:
-                                                                vt_count-=1
-                                                            vt.clear()
-                                                            
-                                                    else:
-                                                        vt.clear()
-                                            
-
-                                            if int(HR)>60 and int(HR)<=300:
-                                                aivr = []
-                                                aivr_count=0
-                                                for i in ll:
-                                                    if i==1:
-                                                        aivr.append(1)
-                                                        if len(aivr)>=4:
-                                                            aivr_count+=1
-                                                            aivr.clear()
-                                                        if 0 in aivr:
-                                                            if aivr_count==0:
-                                                                pass
-                                                            else:
-                                                                aivr_count-=1
-                                                            aivr.clear()
-                                                            
-                                                    else:
-                                                        aivr.clear()
-
-
-                                            if int(HR)<=60:
-                                                ivr = []
-                                                ivr_count=0
-                                                for i in ll:
-                                                    if i==1:
-                                                        ivr.append(1)
-                                                        if len(ivr)>=4:
-                                                            ivr_count+=1
-                                                            ivr.clear()
-                                                        if 0 in ivr:
-                                                            if ivr_count==0:
-                                                                pass
-                                                            else:
-                                                                ivr_count-=1
-                                                            ivr.clear()
-                                                            
-                                                    else:
-                                                        ivr.clear()
-
-
-
-                                            finaliso = actaulPVC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - c_count*2 - t_count*3
-                                            if actaulPVC.count(1)>0:
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Isolated","startTime":pek,"endTime":pek,"percentage":actaulPVC.count(1)/len(rpeaks)*100})
-    #                                            
-                                                result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":actaulPVC.count(1),"HR":int(HR),"ISOLATEDCOUNT":actaulPVC.count(1),"peakslocation":peaksdefined})
-                                            if Quadgem_count>=1:
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Quadrigeminy","startTime":pek,"endTime":pek,"percentage":Quadgem_count*2/len(rpeaks)*100})
-
-                                                result_data.update({"Arrhythmia":'PVC-Quadrigeminy',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                            if Trigem_count>=1:                                            
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Trigeminy","startTime":pek,"endTime":pek,"percentage":Trigem_count*2/len(rpeaks)*100})
-                                                result_data.update({"Arrhythmia":'PVC-Trigeminy',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-
-                                            if bigem_count>=1:
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Bigeminy","startTime":pek,"endTime":pek,"percentage":bigem_count*2/len(rpeaks)*100})
+                                            # finaliso = actaulPVC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - c_count*2 - t_count*3
+                                            if pvc_label:
                                                 
-                                                result_data.update({"Arrhythmia":'PVC-Bigeminy',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                            if c_count>=1:
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Couplet","startTime":pek,"endTime":pek,"percentage":c_count*2/len(rpeaks)*100})
+                                                if 'PVC-Isolated' in pvc_label: #actaulPVC.count(1)>0:
+                                                    result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":observer.count(1),"HR":int(HR),"ISOLATEDCOUNT":observer.count(1),"peakslocation":peaksdefined})
+                                                    
+                                                if 'PVC-Quadrigeminy'in pvc_label: #Quadgem_count>=1:
+                                                    result_data.update({"Arrhythmia":'PVC-Quadrigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                if "PVC-Trigeminy" in pvc_label: #Trigem_count>=1:
+                                                    result_data.update({"Arrhythmia":'PVC-Trigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                if "PVC-Bigeminy" in pvc_label: #bigem_count>=1:
+                                                    result_data.update({"Arrhythmia":'PVC-Bigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                if "PVC-Couplet" in pvc_label: #c_count>=1:
+                                                    result_data.update({"Arrhythmia":'PVC-Couplet',"Vbeats":observer.count(1),"HR":int(HR),"COUPLETCOUNT":pvc_counts['PVC-Couplet_counter'],"peakslocation":peaksdefined}) # c_count
+                                                if "PVC-Triplet" in pvc_label: # t_count>=1:
+                                                    result_data.update({"Arrhythmia":'PVC-Triplet',"Vbeats":observer.count(1),"HR":int(HR),"TRIPLETCOUNT":pvc_counts['PVC-Triplet_counter'],"peakslocation":peaksdefined}) # t_count
+                                                if float(HR)>100.0:
+                                                    if "PVC-VT" in pvc_label and observer.count(1)>12:  #vt_count>=1 and bb.count(1)>12:
+                                                        result_data.update({"Arrhythmia":'VT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                    if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
+                                                        result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
+                                            #    if float(HR)>60.0 and float(HR)<=100.0:
+                                            #        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
+                                            #            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
                                                 
-                                                result_data.update({"Arrhythmia":'PVC-Couplet',"Vbeats":bb.count(1),"HR":int(HR),"COUPLETCOUNT":c_count,"peakslocation":peaksdefined})
-                                            if t_count>=1:
-    #                                            for pek in peaksdefined:
-    #                                                result_data["threeLatter"].append({"Arrhythmia":"PVC-Triplet","startTime":pek,"endTime":pek,"percentage":t_count*3/len(rpeaks)*100})
-                                                
-                                                result_data.update({"Arrhythmia":'PVC-Triplet',"Vbeats":bb.count(1),"HR":int(HR),"TRIPLETCOUNT":t_count,"peakslocation":peaksdefined})
-                                            if float(HR)>100.0:
-                                                    if vt_count>=1 and bb.count(1)>12:
-                                                        result_data.update({"Arrhythmia":'VT',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                    if aivr_count>=1 and bb.count(1)<=12:
-                                                        result_data.update({"Arrhythmia":'NSVT',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-
-                                            if float(HR)>60.0 and float(HR)<=100.0:
-                                                    if aivr_count>=1:
-                                                        result_data.update({"Arrhythmia":'NSVT',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                            
-                                            if float(HR)<=60.0:
-                                                    if ivr_count>=1:
-                                                        result_data.update({"Arrhythmia":'IVR',"Vbeats":bb.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-
+                                                if float(HR)<=100.0:
+                                                    if "PVC-Ivr" in pvc_label: #ivr_count>=1:
+                                                        result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
                                             else:
                                                 wideq = wide_qrs_detection(low_es, fs=200)
@@ -5358,287 +5677,63 @@ def subscribe(client):
                                             d3 = result_data
                                             finddata.append(d3)
 
-
-
                                         if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"] and int(timetaken)>6:
-                                            apeds=[]
-                                            r_index = detect_beats(low_es,200)
-                                            for i in range(len(r_index)-1):
-                                                m=r_index[i+1]-r_index[i]
-                                                apeds.append(m*5/1000)
-
-                                            variations=[]
-                                            rrints=''
-                                            for i in range(len(apeds)-1):
-                                                
-                                                variations.append(get_percentage_diff(apeds[i+1],apeds[i]))
-                                            
-                                            forPAC = Average(variations)
-                                            jr_label = "Abnormal"
-                                            try:
-                                                r_peaks = r_index
-                                                baseline_signal = baseline_construction_200(OriginalSignal, 131)
-                                                pqrst_data = pqrst_detection(baseline_signal, fs=fs, thres=0.37, lp_thres=0.1, rr_thres = 0.15)
-                                                junc_r_label = pqrst_data['R_Label']
-                                                p_index = pqrst_data['P_Index']
-                                                p_t = pqrst_data['P_T List']
-                                                updated_union, junc_union = [], []
-                                                pac_detect, junc_index = [], []
-                                                for i in range(len(r_peaks) - 1):
-                                                    fig, ax = plt.subplots(num=1, clear=True)
-                                                    segment = low_es[r_peaks[i]-16:r_peaks[i + 1]+20]
-                                                    ax.plot(segment,color='blue')
-                                                    ax.axis(False)
-                                                    fig.canvas.draw()
-                                                    data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-                                                    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-                                                    image = Image.fromarray(data)
-                                                    resized_image = image.resize((360, 720), Image.LANCZOS)
-                                                    tensor_image = tf.convert_to_tensor(np.array(resized_image), dtype=tf.float32)
-                                                    plt.close(fig)
-                                                    predictions,ids = prediction_model_PAC(tensor_image)
-                                                    
-                                                    if str(ids) == "PAC" and float(predictions[3])>0.93: # 0.91
-                                                        updated_union.append(1)
-                                                        junc_union.append(0)
-                                                        pac_detect.append(int(r_peaks[i]))
-                                                        pac_detect.append(int(r_peaks[i+1]))
-                                                    elif str(ids) == "Junctional" and float(predictions[1]) > 0.90:
-                                                        junc_union.append(1)
-                                                        updated_union.append(0)
-                                                        junc_index.append(int(r_peaks[i]))
-                                                        junc_index.append(int(r_peaks[i+1]))  
-                                                    else:
-                                                        updated_union.append(0)
-                                                        junc_union.append(0)
-                                                if junc_r_label == "Regular" and HR <= 60:
-                                                    if junc_union:
-                                                      junc_count = junc_union.count(1)
-                                                      total_index = len(junc_union)
-                                                      jr_model_percent = junc_count/ total_index
-                                                      count = 0
-                                                      new_threshold = 0.065 if HR > 50 else 0.06
-                                                      for i in range(len(p_t)-1):
-                                                          dis = (r_index[i+1]-p_t[i][-1])/fs
-                                                          if dis <= new_threshold: count += 1
-                                                      jr_abstraction_per = ((len(r_index)-1 - (len(p_index)-count))/(len(r_index)-1))
-                                                      combined_percent = (jr_model_percent *0.2) + (jr_abstraction_per *0.8)
-                                                      if combined_percent >= 0.75 and jr_model_percent >= 0.2:
-                                                          jr_label = "Junctional_Rhythm" if HR > 40 else "Junctional_Bradycardia"
-                                                      else:
-                                                          jr_label = "Abnormal" 
-                                            except Exception as e:
-                                                print(e)
-                                                updated_union=[0,0,0,0,0,0,0,0]
-                                            if Average(variations)>0.20:
-                                                actaulPAC = updated_union
-                                                bbs = updated_union
-                                            else:
-                                                actaulPAC = [0,0,0,0,0,0,0,0]
-                                                bbs = [0,0,0,0,0,0,0,0]
-                                            bigem = []
-                                            bigem_count= 0
-                                            for q,k in enumerate(bbs):
-                                                if len(bigem) == 3:
-                                                    bigem_count+=1
-                                                    try:
-                                                        if bbs[q] ==0 and bbs[q+1]==1:
-                                                            bigem.clear()
-                                                            bigem.append(1)
-                                                        else:
-                                                            bigem.clear()
-                                                    except:
-                                                        bigem.clear()
-                                                if len(bigem ) ==0 and k ==1:
-                                                    bigem.append(1)
-                                                elif len(bigem) ==1 and k ==0:
-                                                    bigem.append(0)
-                                                elif len(bigem) ==2 and k ==1:
-                                                    bigem.append(1)
-                                                else:
-                                                    if len(bigem)==1 and (1 in bigem) and k==1:
-                                                        bigem.clear()
-                                                        bigem.append(1)
-                                                    elif len(bigem)>1: 
-                                                        bigem.clear()
-                                                        if k ==1:
-                                                            bigem.append(1)            
-                                            if len(bigem) == 3:
-                                                bigem_count+=1
-                                                bigem.clear()
-
-                                            # Trigeminy 
-                                            Trigem = []
-                                            Trigem_count = 0
-                                            for m,l in enumerate(bbs):
-                                                if len(Trigem) == 4:
-                                                    Trigem_count+=1
-                                                    try:
-                                                        if bbs[m] ==0 and bbs[m+1]==0 and bbs[m+2]==1:
-                                                            Trigem.clear()
-                                                            Trigem.append(1)
-                                                        else:
-                                                            Trigem.clear()
-                                                    except:
-                                                        Trigem.clear()
-
-                                                if len(Trigem) ==0 and l ==1:
-                                                    Trigem.append(1)
-                                                elif len(Trigem) ==1 and l ==0:
-                                                    Trigem.append(0)
-                                                elif len(Trigem) ==2 and l ==0:
-                                                    Trigem.append(0)
-                                                elif len(Trigem) ==3 and l ==1:
-                                                    Trigem.append(1)
-                                                else:
-                                                    if len(Trigem)==1 and (1 in Trigem) and l==1:
-                                                        Trigem.clear()
-                                                        Trigem.append(1)
-                                                    elif len(Trigem)>1: 
-                                                        Trigem.clear()
-                                                        if l ==1:
-                                                            Trigem.append(1)
-                                            if len(Trigem) == 4:
-                                                Trigem_count+=1
-                                                Trigem.clear()
-
-                                            # Quadrageminy
-                                            Quadgem = []
-                                            Quadgem_count = 0
-                                            for p,o in enumerate(bbs):
-                                                if len(Quadgem) == 5:
-                                                    Quadgem_count+=1
-                                                    try:
-                                                        if bbs[p] ==0 and bbs[p+1]==0 and bbs[p+2]==0 and bbs[p+3]==1:
-                                                            Quadgem.clear()
-                                                            Quadgem.append(1)
-                                                        else:
-                                                            Quadgem.clear()
-                                                    except:
-                                                        Quadgem.clear()
-                                                if len(Quadgem) ==0 and o ==1:
-                                                    Quadgem.append(1)             
-                                                elif len(Quadgem) ==1 and o ==0:                                     
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==2 and o ==0:            
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==3 and o ==0:            
-                                                    Quadgem.append(0)
-                                                elif len(Quadgem) ==4 and o ==1:                           
-                                                    Quadgem.append(1)
-                                                else:
-                                                    if len(Quadgem)==1 and (o in Quadgem) and o==1:
-                                                        Quadgem.clear()
-                                                        Quadgem.append(1)
-                                                    elif len(Quadgem)>1:                                      
-                                                        Quadgem.clear()
-                                                        if o ==1:
-                                                            Quadgem.append(1)
-                                            if len(Quadgem) == 5:
-                                                Quadgem_count+=1
-                                                Quadgem.clear()
-
-                                            # couplet
-                                            ll=bbs
-                                            couplet = []
-                                            pac_c_count=0
-                                            for i in ll:
-                                                if i==1:
-                                                    couplet.append(1)
-                                                    if len(couplet)==3:
-                                                        pac_c_count-=1
-                                                        couplet.clear()
-                                                    if len(couplet)==2: 
-                                                        pac_c_count+=1    
-                                                    if 0 in couplet:
-                                                        if pac_c_count==0:
-                                                            pass
-                                                        else:
-                                                            pac_c_count-=1
-                                                        couplet.clear()
-                                                else:
-                                                    couplet.clear()
-
-                                            # triplet            
-                                            triplet = []
-                                            pac_t_count=0
-                                            for i in ll:
-                                                if i==1:
-                                                    triplet.append(1)
-                                                    if len(triplet)>=4:
-                                                        pac_t_count-=1
-                                                        triplet.clear()
-                                                    if len(triplet)==3:
-                                                        pac_t_count+=1
-                                                    if 0 in triplet:
-                                                        if pac_t_count==0:
-                                                            pass
-                                                        else:
-                                                            pac_t_count-=1
-                                                        triplet.clear()    
-                                                else:
-                                                    triplet.clear()
-
-                                            if int(HR)>=120:
-                                                at = []
-                                                at_count=0
-                                                for i in ll:
-                                                    if i==1:
-                                                        at.append(1)
-                                                        if len(at)>=4:
-                                                            at_count+=1
-                                                            at.clear()
-                                                        if 0 in at:
-                                                            if at_count==0:
-                                                                pass
-                                                            else:
-                                                                at_count-=1
-                                                            at.clear()
-                                                            
-                                                    else:
-                                                        at.clear()
-                                            
-                                            finaliso = actaulPAC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - pac_c_count*2 - pac_t_count*3
-                                            if actaulPAC.count(1)>0 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Isolated',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"ISOPAC":abs(finaliso)})
-                                                d3 = result_data
-                                                finddata.append(d3)
-                                            if Quadgem_count>=1 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Quadrigeminy',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR),"PACQUADRIGEMCOUNT":Quadgem_count})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if Trigem_count>=1 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Trigeminy',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR),"PACTRIGEMCOUNT":Trigem_count})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if bigem_count>=1 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Bigeminy',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR),"PACBIGEMCOUNT":bigem_count})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if pac_c_count>=1 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Couplet',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR),"PACCOUPLETCOUNT":pac_c_count})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if pac_t_count>=1 and forPAC>6:
-                                                result_data.update({"Arrhythmia":'PAC-Triplet',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR),"PACTRIPLETCOUNT":pac_t_count})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if float(HR)>=150.0:
-                                                if at_count>=1:
-                                                    result_data.update({"Arrhythmia":'SVT',"PACTOTALCOUNT":bbs.count(1),"HR":int(HR)})
+                                            pac_r_index = check_r_index(all_lead_data, fs, int(version))
+                                
+                                            pac_detection_result = PACDetection(all_lead_data, pac_r_index, fs, is_lead=int(version)).get_pac_data()
+                                            actaulPAC = []
+                                            pac_label, jr_label = '', ''
+                                            forpac = 0
+                                            if 'updated_union' in pac_detection_result:
+                                                actaulPAC = pac_detection_result['updated_union']
+                                            if 'pac_label' in pac_detection_result:
+                                                pac_label = pac_detection_result['pac_label']
+                                            if 'pac_counts' in pac_detection_result:
+                                                pac_counts = pac_detection_result['pac_counts']
+                                            if 'variations' in pac_detection_result:
+                                                forpac = Average(pac_detection_result['variations'])
+                                            if 'jnc_label' in pac_detection_result:
+                                                jr_label = pac_detection_result['jnc_label']
+                                            # finaliso = actaulPAC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - pac_c_count*2 - pac_t_count*3
+                                            if pac_label:
+                                                if 'PAC-Isolated' in pac_label and forPAC>6: # actaulPAC.count(1)>0
+                                                    result_data.update({"Arrhythmia":'PAC-Isolated',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"ISOPAC":abs(pac_counts['PAC-Isolated_counter'])})
                                                     d3 = result_data
                                                     finddata.append(d3)
+                                                if  'PAC-Quadrigem' in pac_label and forPAC>6: # Quadgem_count>=1
+                                                    result_data.update({"Arrhythmia":'PAC-Quadrigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACQUADRIGEMCOUNT":pac_counts['PAC-Quadrigem_counter']}) # Quadgem_count
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+
+                                                if 'PAC-Trigem' in pac_label and forPAC>6: # Trigem_count>=1
+                                                    result_data.update({"Arrhythmia":'PAC-Trigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIGEMCOUNT":pac_counts['PAC-Trigem_counter']}) # Trigem_count
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+
+                                                if 'PAC-Bigem' in pac_label and forPAC>6: # bigem_count>=1
+                                                    result_data.update({"Arrhythmia":'PAC-Bigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACBIGEMCOUNT":pac_counts['PAC-Bigem_counter']}) # bigem_count
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+
+                                                if 'PAC-Couplet' in pac_label and forPAC>6: # pac_c_count>=1
+                                                    result_data.update({"Arrhythmia":'PAC-Couplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACCOUPLETCOUNT":pac_counts['PAC-Couplet_counte']}) # pac_c_count
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+
+                                                if 'PAC-Triplet' in pac_label and forPAC>6: # pac_t_count>=1
+                                                    result_data.update({"Arrhythmia":'PAC-Triplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIPLETCOUNT":pac_counts['PAC-Triplet_counter']}) # pac_t_count
+                                                    d3 = result_data 
+                                                    finddata.append(d3)
+
+                                                if float(HR)>=150.0:
+                                                    if 'SVT' in pac_label: # at_count>=1
+                                                        result_data.update({"Arrhythmia":'SVT',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
 
                                         tf.keras.backend.clear_session()
                                         if int(HR)<=80 and int(timetaken)>6 and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
                                             try:
-                                                # baseline_signal = baseline_construction_200(OriginalSignal, 131)
-                                                # jnrhy = jr_detection(baseline_signal,tf_cwt_model, 200)
                                                 jnrhy = jr_label
                                                 if jnrhy=="Junctional_Rhythm":
                                                     result_data.update({"Arrhythmia":'JN-RHY'})
@@ -5656,32 +5751,27 @@ def subscribe(client):
                                             d3 = result_data
                                             finddata.append(d3)
                                             
-                                            
-                                        #datetimee.clear()
-                                        #newlist.clear()
-
                                         if (result_data['Arrhythmia']=='BR' or result_data['Arrhythmia']=='Short Pause' or result_data['Arrhythmia']=='Normal' or result_data['Arrhythmia']=='') and int(HR)<80 and int(timetaken)>=7:
                                             try:
-                                                block_na = lowpass_11(naa)
-                                                labelss = block_process(block_na, 200)
-                                                final_label,ei_ti_block = block_model_check(block_na, 200, labelss)
+                                                block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
+                                                final_label = block_results['block_label']
+                                                ei_ti_block = block_results['ei_ti_label']
                                                 if final_label == "III Degree": 
                                                     result_data.update({"Arrhythmia":'III Degree'})
                                                     for ei_ti_blockdata in ei_ti_block:
-                                                            result_data["threeLatter"].append(ei_ti_blockdata)
+                                                        result_data["threeLatter"].append(ei_ti_blockdata)
                                                     d3 = result_data
                                                     finddata.append(d3)
                                                 elif final_label == "MOBITZ-I":
                                                     result_data.update({"Arrhythmia":'MOBITZ-I'})
                                                     for ei_ti_blockdata in ei_ti_block:
-                                                            result_data["threeLatter"].append(ei_ti_blockdata)
-
+                                                        result_data["threeLatter"].append(ei_ti_blockdata)
                                                     d3 = result_data
                                                     finddata.append(d3)
                                                 elif final_label == "MOBITZ-II":
                                                     result_data.update({"Arrhythmia":'MOBITZ-II'})
                                                     for ei_ti_blockdata in ei_ti_block:
-                                                            result_data["threeLatter"].append(ei_ti_blockdata)
+                                                        result_data["threeLatter"].append(ei_ti_blockdata)
                                                     
                                                     d3 = result_data
                                                     finddata.append(d3)
@@ -5691,23 +5781,13 @@ def subscribe(client):
                                                         result_data.update({"Arrhythmia":'SINUS-ARR'})
                                                         d3 = result_data
                                                         finddata.append(d3)
-    #                                                else:
-    #                                                    result_data.update({"Arrhythmia":'ABNORMAL'})
-    #                                                    d3 = result_data
-    #                                                    finddata.append(d3)
-
                                             except Exception as e:
                                                 print("MOBITZ-I,MOBITZ-II,III Degree issue",e)
                                                 
                                         if result_data['Arrhythmia']=='' and rrint == "IRREGULAR":
-                                                result_data.update({"Arrhythmia":'SINUS-ARR'})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-    ##                                    if result_data['Arrhythmia']=='':
-    ##                                            result_data.update({"Arrhythmia":'ABNORMAL'})
-    ##                                            d3 = result_data
-    ##                                            finddata.append(d3)
+                                            result_data.update({"Arrhythmia":'SINUS-ARR'})
+                                            d3 = result_data
+                                            finddata.append(d3)
 
                                         if (result_data['Arrhythmia']=='Normal' or rrint=="REGULAR") and int(HR)<100 and int(timetaken)>7:
                                             try:
@@ -5720,7 +5800,6 @@ def subscribe(client):
                                                 rpeaks1 = unique(rpeaksnew)
                                                 Ppeaks = unique(waves_peak['ECG_P_Peaks'])
                                                 
-
                                                 #dwt method
                                                 for iii in range(len(Ppeaks)):
                                                     if np.isnan(Ppeaks[iii]):
@@ -5730,7 +5809,6 @@ def subscribe(client):
                                                         difff = rpeaksnew[iii]-Ppeaks[iii]
                                                         firststblock.append((difff*5)/1000)
                                                 firstblockfinal=[]
-                    ##                            print("FIRST",firststblock)
                                                 for findtime in firststblock:
                                                     if findtime>0.26:
                                                         firstblockfinal.append(findtime)
@@ -5744,41 +5822,6 @@ def subscribe(client):
                                             except:
                                                 print("I degree issue")
 
-
-
-
-    ##                                    if result_data['Arrhythmia']=='Normal' and int(HR)<100 and int(timetaken)>7:
-    ##                                        try:
-    ##                                            labelss = block_process(naa, 200)
-    ##                                            if labelss=="3rd Degree block":
-    ##                                                result_data.update({"Arrhythmia":'III Degree'})
-    ##                                                d3 = result_data
-    ##                                                finddata.append(d3)
-    ##                                            else:
-    ##                                                pass
-    ##                                        except:
-    ##                                            print("MOBITZ-I,MOBITZ-II,III Degree issue")
-                                            
-    #                                    if int(HR)<80 and int(timetaken)>7:
-    #                                        try:
-    #                                            labelss = block_process(naa, 200)
-    #                                            if labelss=="3rd Degree block":
-    #                                                result_data.update({"Arrhythmia":'III Degree'})
-    #                                                d3 = result_data
-    #                                                finddata.append(d3)
-    #                                            elif labelss=="Mobitz I": # ------------ NEW added
-    #                                                result_data.update({"Arrhythmia":'MOBITZ-I'})
-    #                                                d3 = result_data
-    #                                                finddata.append(d3)
-    #                                            elif labelss=="Mobitz II":
-    #                                                result_data.update({"Arrhythmia":'MOBITZ-II'})
-    #                                                d3 = result_data
-    #                                                finddata.append(d3)
-    #                                            else:
-    #                                                pass
-    #                                        except Exception as e:
-    #                                            print("MOBITZ-I,MOBITZ-II,III Degree issue",e)                                            
-                                            
                                         try:    
                                             pace_label, pacemaker_index, r_index, q_index, s_index, p_index = pacemaker_detect(low_es, fs= 200)
                                             if pace_label == "Atrial_Pacemaker":
@@ -5786,12 +5829,10 @@ def subscribe(client):
                                                 d3 = result_data
                                                 finddata.append(d3)
 
-
                                             if pace_label == "Ventricular_Pacemaker":
                                                 result_data.update({"VENTRICULAR_PACEMAKER":True})
                                                 d3 = result_data
                                                 finddata.append(d3)
-
 
                                             if pace_label == "Atrial_&_Ventricular_pacemaker":
                                                 result_data.update({"AV_PACEMAKER":True})
@@ -5803,18 +5844,16 @@ def subscribe(client):
                                         try:
                                             naMI = np.array(newdada)
                                             if int(HR)<100 and int(timetaken)>6 and int(version)==5 and rrint=="REGULAR":
-                                                #label_mi = process_signal(naMI, 200)
                                                 label_rlbbb = LBBB_RBBB(b_es,rpeaks,imageresource)
 
-                                                all_lead_data = data_convert_MI(sorted_data) #, path=save, patient_id
+                                                all_lead_data = data_convert_MI(sorted_data, int(version)) #, path=save, patient_id
                                                 if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
-                                                    # label_mi = MIDetection_MI(all_lead_data, 200).check_MI()
                                                     label_mi = check_mi_model(all_lead_data, imageresource)
-                                                    if lbbb_rbbb_label == "LBBB": # if label_mi == "LBBB":
+                                                    if lbbb_rbbb_label == "LBBB": 
                                                         result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
                                                         d3 = result_data
                                                         finddata.append(d3)
-                                                    elif lbbb_rbbb_label == 'RBBB': #label_mi == "RBBB":
+                                                    elif lbbb_rbbb_label == 'RBBB': 
                                                         result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
                                                         d3 = result_data
                                                         finddata.append(d3)                                               
@@ -5830,25 +5869,6 @@ def subscribe(client):
                                                         result_data.update({"Arrhythmia":'ABNORMAL',"MI":"T wave Abnormality"})
                                                         d3 = result_data
                                                         finddata.append(d3)
-                                                #    elif label_mi == "STEMI":
-                                                #        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"STEMI"})
-                                                #        d3 = result_data
-                                                #        finddata.append(d3)
-                                                #    elif label_mi == "NSTEMI":
-                                                #        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"NSTEMI"})
-                                                #        d3 = result_data
-                                                #        finddata.append(d3)
-                                                #    elif label_mi == "Anterior STEMI":
-                                                #        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Anterior STEMI"})
-                                                #        d3 = result_data
-                                                #        finddata.append(d3)
-                                                #    elif label_mi == "Posterior STEMI":
-                                                #        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Posterior STEMI"})
-                                                #        d3 = result_data
-                                                #        finddata.append(d3)
-                                                
-                                                
-                                                
                                         except:
                                             print("Error in MI")
                                             
@@ -5877,30 +5897,26 @@ def subscribe(client):
                                                 result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
                                                 print("FinalLog:",result_data)
                                                 client.publish(topic_y,json.dumps(result_data),qos=2)
-        ##                                        item = queue.pop()
                                             else:
                                                 
                                                 for i in newdata:
                                                     x = mycol.insert_one(dict(i))
                                                 client.publish(topic_y,json.dumps(newdata),qos=2)
-        ##                                        item = queue.pop()
                                                 end = time.time()
                                                 print("Time Taken:",end-start)
                                         else:
                                             client.publish(topic_y,json.dumps(newdata),qos=2)
-        ##                                    item = queue.pop()
                                             end = time.time()
                                             print("Time Taken:",end-start)
 
                                     except Exception as e:
-                                                print("DATA Corrupted inside",e)
-                                                tb = traceback.extract_tb(e.__traceback__)
-                                                line_number = tb[-1][1]  # Extract the line number from the last entry in the traceback
-                                                print(f"Exception occurred on line {tb}: {tb}")
-                                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                                print("LOG:",result_data)
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
-    ##                                        client.on_message = on_message
+                                        print("DATA Corrupted inside",e)
+                                        tb = traceback.extract_tb(e.__traceback__)
+                                        line_number = tb[-1][1]  # Extract the line number from the last entry in the traceback
+                                        print(f"Exception occurred on line {tb}: {tb}")
+                                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
+                                        print("LOG:",result_data)
+                                        client.publish(topic_y,json.dumps(result_data),qos=2)
 
 
             except Exception as e:

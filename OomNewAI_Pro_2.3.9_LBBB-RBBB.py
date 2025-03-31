@@ -131,7 +131,7 @@ folder_path = os.path.join("rawdata/", random_folder_name)
 os.makedirs(folder_path)
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_49_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_52_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -180,11 +180,6 @@ def baseline_construction_200(ecg_signal, kernel_size=101):
     s_corrected = signal.detrend(ecg_signal)
     baseline_corrected = s_corrected - signal.medfilt(s_corrected, kernel_size)
     return baseline_corrected
-
-def lowpass_11(file):
-    b, a = signal.butter(3, 0.3, btype='lowpass', analog=False)
-    low_passed = signal.filtfilt(b, a, file)
-    return low_passed
 
 def prediction_model(image_path, target_shape=[224, 224], class_name=True):
     with results_lock:
@@ -317,8 +312,6 @@ def Vfib_asys_detection(all_leads_data, is_lead=2):
         lead_data = {}
         if lead in analysis_leads:
             ecg_signal = all_leads_data[lead].values
-            # baseline_signal = baseline_construction_200(ecg_signal)
-            # lowpass_signal = lowpass(baseline_signal)
             vi_model_result = check_vfib_vfl_model(ecg_signal)
             lead_data['vfib_result'] = vi_model_result
             all_lead_det_data[lead] = lead_data
@@ -383,63 +376,6 @@ def diff(x,y):
                 
     return pac
 
-# def detect_beats(
-#         baseline_signal,  # The raw ECG signal
-#         fs,  # Sampling fs in HZ
-#         # Window size in seconds to use for
-#         ransac_window_size=3.0, #5.0
-#         # Low frequency of the band pass filter
-#         lowfreq=5.0,
-#         # High frequency of the band pass filter
-#         highfreq=7.0,
-# ):
-#     ransac_window_size = int(ransac_window_size * fs)
-
-#     lowpass = scipy.signal.butter(1, highfreq / (fs / 2.0), 'low')
-#     highpass = scipy.signal.butter(1, lowfreq / (fs / 2.0), 'high')
-#     # TODO: Could use an actual bandpass filter
-#     ecg_low = scipy.signal.filtfilt(*lowpass, x=baseline_signal)
-#     ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
-
-#     # Square (=signal power) of the first difference of the signal
-#     decg = np.diff(ecg_band)
-#     decg_power = decg ** 2
-
-#     # Robust threshold and normalizator estimation
-#     thresholds = []
-#     max_powers = []
-#     for i in range(int(len(decg_power) / ransac_window_size)):
-#         sample = slice(i * ransac_window_size, (i + 1) * ransac_window_size)
-#         d = decg_power[sample]
-#         thresholds.append(0.5 * np.std(d))
-#         max_powers.append(np.max(d))
-
-#     threshold = np.median(thresholds)
-#     max_power = np.median(max_powers)
-#     decg_power[decg_power < threshold] = 0
-
-#     decg_power /= max_power
-#     decg_power[decg_power > 1.0] = 1.0
-#     square_decg_power = decg_power ** 4
-#     # square_decg_power = decg_power**4
-
-#     shannon_energy = -square_decg_power * np.log(square_decg_power)
-#     shannon_energy[~np.isfinite(shannon_energy)] = 0.0
-
-#     mean_window_len = int(fs * 0.125 + 1)
-#     lp_energy = np.convolve(shannon_energy, [1.0 / mean_window_len] * mean_window_len, mode='same')
-#     # lp_energy = scipy.signal.filtfilt(*lowpass2, x=shannon_energy)
-
-#     lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs / 14.0) # 20.0
-#     # lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, fs/8.0)
-#     lp_energy_diff = np.diff(lp_energy)
-
-#     zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
-#     zero_crossings = np.flatnonzero(zero_crossings)
-#     zero_crossings -= 1
-
-#     return zero_crossings
-
 def detect_beats(ecg, rate, ransac_window_size=3.35, lowfreq=5.0, highfreq=15.0):
     ransac_window_size = int(ransac_window_size * rate)
     lowpass = scipy.signal.butter(1, highfreq / (rate / 2.0), 'low')
@@ -490,67 +426,22 @@ def detect_beats(ecg, rate, ransac_window_size=3.35, lowfreq=5.0, highfreq=15.0)
         rpeaks.append(rpeak)
     return np.array(rpeaks)
 
-    
-def detect_beats1(
-		ecg,	# The raw ECG signal
-		rate,	# Sampling rate in HZ
-		# Window size in seconds to use for 
-		ransac_window_size=2.0,
-		# Low frequency of the band pass filter
-		lowfreq=5.0,
-		# High frequency of the band pass filter
-		highfreq=8.0,
-		):
-	ransac_window_size = int(ransac_window_size*rate)
-
-	lowpass = scipy.signal.butter(1, highfreq/(rate/2.0), 'low')
-	highpass = scipy.signal.butter(1, lowfreq/(rate/2.0), 'high')
-	# TODO: Could use an actual bandpass filter
-	ecg_low = scipy.signal.filtfilt(*lowpass, x=ecg)
-	ecg_band = scipy.signal.filtfilt(*highpass, x=ecg_low)
-	
-	# Square (=signal power) of the first difference of the signal
-	decg = np.diff(ecg_band)
-	decg_power = decg**2
-	
-	# Robust threshold and normalizator estimation
-	thresholds = []
-	max_powers = []
-	for i in range(int(len(decg_power)/ransac_window_size)):
-		sample = slice(i*ransac_window_size, (i+1)*ransac_window_size)
-		d = decg_power[sample]
-		thresholds.append(0.5*np.std(d))
-		max_powers.append(np.max(d))
-
-	threshold = np.median(thresholds)
-	max_power = np.median(max_powers)
-	decg_power[decg_power < threshold] = 0
-
-	decg_power /= max_power
-	decg_power[decg_power > 1.0] = 1.0
-	square_decg_power = decg_power**4
-	#square_decg_power = decg_power**4
-
-	shannon_energy = -square_decg_power*np.log(square_decg_power)
-	shannon_energy[~np.isfinite(shannon_energy)] = 0.0
-
-	mean_window_len = int(rate*0.125+1)
-	lp_energy = np.convolve(shannon_energy, [1.0/mean_window_len]*mean_window_len, mode='same')
-	#lp_energy = scipy.signal.filtfilt(*lowpass2, x=shannon_energy)
-	
-	lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, rate/20.0)
-	#lp_energy = scipy.ndimage.gaussian_filter1d(lp_energy, rate/8.0)
-	lp_energy_diff = np.diff(lp_energy)
-
-	zero_crossings = (lp_energy_diff[:-1] > 0) & (lp_energy_diff[1:] < 0)
-	zero_crossings = np.flatnonzero(zero_crossings)
-	zero_crossings -= 1
-	return zero_crossings
-
 def SACompare(list1, val):
     l=[]
     for x in list1:
         if x>=val:
+            l.append(1)
+        else:
+            l.append(0)
+    if 1 in l:
+        return True
+    else:
+        return False
+
+def SACompareShort(list1, val1,val2):
+    l=[]
+    for x in list1:
+        if x>=val1 and x<=val2:
             l.append(1)
         else:
             l.append(0)
@@ -578,16 +469,6 @@ def connect_mqtt() -> mqtt_client:
     client.on_connect = on_connect
     client.connect(broker, port)
     return client
-
-def lowpass_1(file):
-    b, a = signal.butter(3, 0.2, btype='lowpass', analog=False)
-    low_passed = signal.filtfilt(b, a, file)
-    return low_passed
-
-def lowpass_2(file):
-    b, a = signal.butter(3, 0.2, btype='lowpass', analog=False)
-    low_passed = signal.filtfilt(b, a, file)
-    return low_passed
 
 def prediction_model_noise(input_arr):
     with results_lock:
@@ -628,11 +509,9 @@ def check_noise_model(ecg_signal, frequency):
         output_data, class_name = prediction_model_noise(image_data)
         if class_name == 'Normal':
             baseline.append(((start, end), output_data))
-            # percent['Normal'] += (end - start) / total_data
             percentage['Normal'] += 1
         else:
             non_ecg.append(((start, end), output_data))
-            # percent['Noise'] += (end - start) / total_data
             percentage['Noise'] += 1
         start += steps_data
     noise_label = 'Normal'
@@ -645,9 +524,6 @@ def check_noise_model(ecg_signal, frequency):
 
 def noise_engine(all_leads_data, version):
     noise_label = 'Normal'
-    # if flag == "200":
-    #     ecg_signal = np.array(ecgdata["ECG"])
-    #     noise_label = check_noise_model(ecg_signal, 200)
     noise_result_dic = {}
     noise_results = []
     for lead in all_leads_data.keys():
@@ -661,10 +537,11 @@ def noise_engine(all_leads_data, version):
         if noise_result_dic['II'] == 'high_noise':
             noise_label = 'high_noise'
     elif version == 5 or version == 8:
-        if noise_result_dic['I'] == 'high_noise' and noise_result_dic['II'] == 'high_noise':
-            noise_label = 'high_noise'
-        elif noise_result_dic['I'] == 'high_noise' or noise_result_dic['v5'] == 'high_noise':
-            noise_label = 'high_noise'
+        if noise_result_dic:
+            if noise_result_dic['I'] == 'high_noise' and noise_result_dic['II'] == 'high_noise':
+                noise_label = 'high_noise'
+            elif noise_result_dic['I'] == 'high_noise' or noise_result_dic['v5'] == 'high_noise':
+                noise_label = 'high_noise'
     return noise_label
     
 def unique(list1):
@@ -853,7 +730,6 @@ def baseline_construction_250(ecg_signal, kernel_size=131):
     s_corrected = signal.detrend(s_als)
     corrected_baseline = s_corrected - signal.medfilt(s_corrected, kernel_size)
     return corrected_baseline
-
 
 def find_s_indexs(ecg, R_index, d):
     d = int(d) + 1
@@ -1129,65 +1005,6 @@ def find_new_q_index(ecg, R_index, d):
             if a == 0:
                 q.append(q_[0])
     return np.sort(q)
-
-def find_new_s_index(ecg, R_index, d):
-    s = []
-    end_index = len(ecg)
-    for i in R_index:
-        s_ = []
-        if i == len(ecg):
-            s.append(i)
-            continue
-        if ecg[i] > 0:
-            c = i
-            while c+1 < end_index and ecg[c+1] < ecg[c]:
-                c += 1
-            if ecg[i] * 0.01 > ecg[c] or ecg[c] < 0 or c == end_index-1:
-                if abs(i-c) <= d:
-                    s.append(c)
-                    continue
-                else:
-                    s_.append(c)
-            while c+1 < end_index:
-                while c+1 < end_index and ecg[c+1] > ecg[c]:
-                    c += 1
-                while c+1 < end_index and ecg[c+1] < ecg[c]:
-                    c += 1
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if ecg[i] * 0.01 > ecg[c] or ecg[c] < 0 or c == end_index-1:
-                    break
-        else:
-            c = i
-            while c+1 < end_index and ecg[c+1] > ecg[c]:
-                c += 1
-            if ecg[i] * 0.01 < ecg[c] or ecg[c] > 0 or c == end_index-1:
-                if abs(i-c) <= d:
-                    s.append(c)
-                    continue
-                else:
-                    s_.append(c)
-            while c < end_index:
-                while c+1 < end_index and ecg[c+1] > ecg[c]:
-                    c += 1
-                while c+1 < end_index and ecg[c+1] < ecg[c]:
-                    c += 1
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if ecg[i] * 0.01 < ecg[c] or ecg[c] > 0 or c == end_index-1:
-                    break
-        if s_:
-            a = 0
-            for _s in s_[::-1]:
-                if abs(i-_s) <= d:
-                    a = 1
-                    s.append(_s)
-                    break
-            if a == 0:
-                s.append(s_[0])
-    return np.sort(s)
 
 def find_r_peaks(ecg_signal,fs=200):
     """Finds R-peaks in an ECG signal using the Hamilton segmenter algorithm.
@@ -1571,234 +1388,6 @@ def funcs(sorted_data):
         df = pd.DataFrame({"DateTime":date_time, "ECG":data_list})
         return df 
 
-def find_s_newnew_index(ecg, R_index, d):
-    end_index = len(ecg) - 1
-    range_per = 0.03
-    small_range_per = 0.01
-    s = []
-    for r in R_index:
-        r_range = abs(ecg[r] * range_per)
-        r_range__ = abs(ecg[r] * small_range_per)
-        s_, sss = [], []
-        if r == len(ecg):
-            s.append(r)
-            continue
-        if ecg[r] > 0:
-            c = r
-            while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                c += 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    sss.append(c)
-            if (-(r_range) <= ecg[c] <= r_range)  or c == end_index or abs(r-c) > d:
-                s_.append(c)
-            # s_.append(c)
-            while c+1 <= end_index and abs(r-c) <= d:
-                while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == end_index:
-                    break
-            
-        else:
-            c = r
-            while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                c += 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    sss.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == end_index or abs(r-c) > d:
-                s_.append(c)
-            # s_.append(c)
-            while c <= end_index and abs(r-c) <= d:
-                while c+1 <= end_index and ecg[c+1] > ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                while c+1 <= end_index and ecg[c+1] < ecg[c] and abs(r-c) <= d:
-                    c += 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        sss.append(c)
-                if s_ and s_[-1] == c:
-                    break
-                s_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range)  or c == end_index:
-                    break
-        if s_ or sss:
-            a = 0
-            for _s in s_[::-1]:
-                if (-(r_range__) <= ecg[_s] <= r_range__):
-                    a = 1
-                    s.append(_s)
-                    break
-            if a == 0:
-                for _s in sss[::-1]:
-                    if (-(r_range__) <= ecg[_s] <= r_range__):
-                        a = 1
-                        s.append(_s)
-                        break
-            if a == 0:
-                if ecg[r] > 0:
-                    for _s in s_[::-1]:
-                        if ecg[_s] <= r_range:
-                            a = 1
-                            s.append(_s)
-                            break
-                    if a == 0:
-                        for _s in sss[::-1]:
-                            if ecg[_s] <= r_range__:
-                                a = 1
-                                s.append(_s)
-                                break
-                else:
-                    for _s in s_[::-1]:
-                        if -r_range <= ecg[_s] :
-                            a = 1
-                            s.append(_s)
-                            break
-                    if a == 0:
-                        for _s in sss[::-1]:
-                            if -r_range__ <= ecg[_s] :
-                                a = 1
-                                s.append(_s)
-                                break
-            if a == 0: 
-                if r+d<=len(ecg):
-                    s_array = ecg[r:r+d]
-                else:
-                    s_array = ecg[r:]
-                if ecg[r] > 0:
-                    s_index = r+np.where(s_array == min(s_array))[0][0]
-                else:
-                    s_index = r+np.where(s_array == max(s_array))[0][0]
-                s.append(s_index)
-    return np.sort(s)
-
-def find_q_newnew_index(ecg, R_index, d):
-    q = []
-    range_per = 0.03
-    small_range_per = 0.01
-    for r in R_index:
-        r_range = abs(ecg[r] * range_per)
-        r_range__ = abs(ecg[r] * small_range_per)
-        q_, qqq = [], []
-        if r == 0:
-            q.append(r)
-            continue
-        if ecg[r] > 0:
-            c = r
-            while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                c -= 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
-                q_.append(c)
-            # q_.append(c)
-            while c > 0 and abs(r-c) <= d:
-                while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                if q_ and q_[-1] == c:
-                    break
-                q_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
-                    break
-        else:
-            c = r
-            while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                c -= 1
-                if (-(r_range) <= ecg[c] <= r_range):
-                    qqq.append(c)
-            if (-(r_range) <= ecg[c] <= r_range) or c == 0 or abs(r-c) > d:
-                q_.append(c)
-            # q_.append(c)
-            while c > 0 and abs(r-c) <= d:
-                while c > 0 and ecg[c-1] < ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                while c > 0 and ecg[c-1] > ecg[c] and abs(r-c) <= d:
-                    c -= 1
-                    if (-(r_range) <= ecg[c] <= r_range):
-                        qqq.append(c)
-                if q_ and q_[-1] == c:
-                    break
-                q_.append(c)
-                if abs(r-c) <= d and (-(r_range) <= ecg[c] <= r_range) or c == 0:
-                    break
-        if q_ or qqq:
-            a = 0
-            for _q in q_[::-1]:
-                if (-(r_range__) <= ecg[_q] <= r_range__):
-                    a = 1
-                    q.append(_q)
-                    break
-            if a == 0:
-                for _q in qqq[::-1]:
-                    if (-(r_range__) <= ecg[_q] <= r_range__):
-                        a = 1
-                        q.append(_q)
-                        break
-            if a == 0:
-                if ecg[r] > 0:
-                    for _q in q_[::-1]:
-                        if ecg[_q] <= r_range:
-                            a = 1
-                            q.append(_q)
-                            break
-                    if a == 0:
-                        for _q in qqq[::-1]:
-                            if ecg[_q] <= r_range__:
-                                a = 1
-                                q.append(_q)
-                                break
-                else:
-                    for _q in q_[::-1]:
-                        if -r_range <= ecg[_q] :
-                            a = 1
-                            q.append(_q)
-                            break
-                    if a == 0:
-                        for _q in qqq[::-1]:
-                            if -r_range__ <= ecg[_q] :
-                                a = 1
-                                q.append(_q)
-                                break
-            if a == 0:
-                if 0 <= r - d:
-                    q_array = ecg[r - d:r]
-                else:
-                    q_array = ecg[:r]
-                if ecg[r] > 0:
-                    q_index = r - (len(q_array) - np.where(q_array == min(q_array))[0][0])
-                else:
-                    q_index = r - (len(q_array) - np.where(q_array == max(q_array))[0][0])
-                q.append(q_index)
-    return np.sort(q)
-
-def wide_qrs(q_index, r_index, s_index, fs=200):
-    label = 'Abnormal'
-    wideQRS = []
-    thresold = round(fs * 0.12)
-    for k in range(len(r_index)):
-        diff = s_index[k] - q_index[k]
-        if diff > thresold:
-            wideQRS.append(r_index[k])
-    if len(wideQRS)/ len(r_index) >= 0.50:
-        label = 'Wide_QRS'
-    return label, wideQRS
-
 def wide_qrss(q_index, r_index, s_index, fs=200):
     label = 'Abnormal'
     wideQRS = []
@@ -2014,11 +1603,6 @@ def hamilton_segmenter(signal=None, sampling_rate=200.0):
             if indexqrs == init_ecg:
                 indexqrs = 0
         if dx[f] <= DT:
-            # 4 - not valid
-            # 5 - If no QRS has been detected within 1.5 R-to-R intervals,
-            # there was a peak that was larger than half the detection threshold,
-            # and the peak followed the preceding detection by at least 360 ms,
-            # classify that peak as a QRS complex
             tf = f + bpsi
             # RR interval median
             RRM = np.median(rrinterval)  # initial values are good?
@@ -2244,134 +1828,7 @@ def find_r_peakss(ecg_signal,fs=200):
             r_.append(r)
     return np.unique(r_) if r_ else r_index_
 
-
-def PACcounter(PAC_R_Peaks, hr_counts):
-    at_counter = 0
-    couplet_counter = 0
-    triplet_counter = 0
-    bigeminy_counter = 0
-    trigeminy_counter = 0
-    quadrigeminy_counter = 0
-    at = 0
-    i = 0
-    while i < len(PAC_R_Peaks):
-        count = 0
-        ones_count = 0
-        while i < len(PAC_R_Peaks) and PAC_R_Peaks[i] == 1:
-            count += 1
-            ones_count += 1
-            i += 1
-
-        if count >= 4:
-            at_counter += 1
-            at += ones_count
-            count = 0
-            ones_count = 0
-        if count == 3:
-            triplet_counter += 1
-        elif count == 2:
-            couplet_counter += 1
-
-        i += 1
-
-    j = 0
-    while j < len(PAC_R_Peaks) - 1:
-        if PAC_R_Peaks[j] == 1:
-            k = j + 1
-            spaces = 0
-            while k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 0:
-                spaces += 1
-                k += 1
-
-            if k < len(PAC_R_Peaks) and PAC_R_Peaks[k] == 1:
-                if spaces == 1:
-                    bigeminy_counter += 1
-                elif spaces == 2:
-                    trigeminy_counter += 1
-                elif spaces == 3:
-                    quadrigeminy_counter += 1
-            j = k
-
-        else:
-            j += 1
-    
-    total_one = (1*at) + (couplet_counter*2)+ (triplet_counter*3)+ (bigeminy_counter*2)+ (trigeminy_counter*2)+ (quadrigeminy_counter*2)
-    total = at_counter + couplet_counter+ triplet_counter+ bigeminy_counter+ trigeminy_counter+ quadrigeminy_counter
-    ones = PAC_R_Peaks.count(1)
-    if total == 0:
-        Isolated = ones
-    else:
-        Common = total-1
-        Isolated = ones - (total_one - Common)
-    if hr_counts > 100:
-        triplet_counter = couplet_counter = quadrigeminy_counter = trigeminy_counter = bigeminy_counter = Isolated = 0
-    if at_counter>=1 and hr_counts > 190:
-        at_counter=1
-    else:
-        at_counter=0
-
-    data = {"PAC-ISO_counter":Isolated,
-            "PAC-Bigem_counter":bigeminy_counter,
-            "PAC-Trigem_counter":trigeminy_counter,
-            "PAC-Quadrigem_counter":quadrigeminy_counter,
-            "PAC-Couplet_counter":couplet_counter,
-            "PAC-Triplet_counter":triplet_counter,
-            "PAC-AT_counter":at_counter}
-    return data
-
-def wide_qrs_find(q_index, r_index, s_index, hr_count, fs=200):
-    """The distance between the QRS complex's Q wave and S wave.
-
-    Args:
-        q_index (list): Q waves indices in an ECG signal
-        r_index (list): R-peak indices in an ECG signal
-        s_index (list): S waves indices in an ECG signal
-        fs (int, optional): sampling rate of the ECG signal, defaults to 200 (optional)
-
-    Returns:
-        array: the R-peak indices that correspond to wide QRS complexes in an ECG signal.
-    The function takes in three arrays as inputs: q_index, r_index, and s_index, which represent the
-    indices of the Q-wave onset, R-peak, and S-wave offset, respectively. The function loops through the
-    R-peak indices and calculates the difference between
-    """
-    max_indexs = 0
-    if hr_count <= 88:
-        ms = 0.10
-    else:
-        ms = 0.12
-    max_indexs = int(fs * ms)
-    pvc = []
-    difference = []
-    pvc_index = []
-    wide_qs_diff = []
-    for k in range(len(r_index)):
-        diff = s_index[k] - q_index[k]
-        difference.append(diff)
-        if max_indexs != 0:
-            if diff>=max_indexs:
-                pvc.append(r_index[k])
-
-    if hr_count <= 88:
-        wide_r_index_per = len(pvc)/ len(r_index)
-        if wide_r_index_per < 0.8:
-            pvc_index = np.array(pvc)
-        else:
-            ms = 0.12
-            max_indexs = int(fs * ms)
-            for k in range(len(r_index)):
-                diff = s_index[k] - q_index[k]
-                wide_qs_diff.append(diff)
-                if max_indexs != 0:
-                    if diff>=max_indexs:
-                        pvc_index.append(r_index[k])
-            difference = wide_qs_diff
-    else:
-        pvc_index = np.array(pvc) 
-    q_s_difference = [i/200 for i in difference]
-    return np.array(pvc_index), q_s_difference
-
 class FilterSignal:
-    
     def __init__(self, ecg_signal, fs = 200):
         self.ecg_signal = ecg_signal
         self.fs = fs
@@ -2426,8 +1883,7 @@ class FilterSignal:
             
         return self.baseline_signal, lowpass_signal
 
-
-class pqrst_detections:
+class PqrstDetection:
     def __init__(self, ecg_signal, fs=200, thres=0.5, lp_thres=0.2, rr_thres=0.12, width=(5, 50)):
         self.ecg_signal = ecg_signal
         self.fs = fs
@@ -2850,65 +2306,7 @@ class pqrst_detections:
                     q.append(q_[0])
         return np.sort(q)
 
-    def find_new_s_index(self, d):
-        s = []
-        end_index = len(self.ecg_signal)
-        for i in self.r_index:
-            s_ = []
-            if i == len(self.ecg_signal):
-                s.append(i)
-                continue
-            if self.ecg_signal[i] > 0:
-                c = i
-                while c+1 < end_index and self.ecg_signal[c+1] < self.ecg_signal[c]:
-                    c += 1
-                if self.ecg_signal[i] * 0.01 > self.ecg_signal[c] or self.ecg_signal[c] < 0 or c == end_index-1:
-                    if abs(i-c) <= d:
-                        s.append(c)
-                        continue
-                    else:
-                        s_.append(c)
-                while c+1 < end_index:
-                    while c+1 < end_index and self.ecg_signal[c+1] > self.ecg_signal[c]:
-                        c += 1
-                    while c+1 < end_index and self.ecg_signal[c+1] < self.ecg_signal[c]:
-                        c += 1
-                    if s_ and s_[-1] == c:
-                        break
-                    s_.append(c)
-                    if self.ecg_signal[i] * 0.01 > self.ecg_signal[c] or self.ecg_signal[c] < 0 or c == end_index-1:
-                        break
-            else:
-                c = i
-                while c+1 < end_index and self.ecg_signal[c+1] > self.ecg_signal[c]:
-                    c += 1
-                if self.ecg_signal[i] * 0.01 < self.ecg_signal[c] or self.ecg_signal[c] > 0 or c == end_index-1:
-                    if abs(i-c) <= d:
-                        s.append(c)
-                        continue
-                    else:
-                        s_.append(c)
-                while c < end_index:
-                    while c+1 < end_index and self.ecg_signal[c+1] > self.ecg_signal[c]:
-                        c += 1
-                    while c+1 < end_index and self.ecg_signal[c+1] < self.ecg_signal[c]:
-                        c += 1
-                    if s_ and s_[-1] == c:
-                        break
-                    s_.append(c)
-                    if self.ecg_signal[i] * 0.01 < self.ecg_signal[c] or self.ecg_signal[c] > 0 or c == end_index-1:
-                        break
-            if s_:
-                a = 0
-                for _s in s_[::-1]:
-                    if abs(i-_s) <= d:
-                        a = 1
-                        s.append(_s)
-                        break
-                if a == 0:
-                    s.append(s_[0])
-        return np.sort(s)
-
+    
     def find_r_peaks(self):
         r_ = []
         out = self.hamilton_segmenter()
@@ -3206,180 +2604,7 @@ class pqrst_detections:
                 'inv_t_index': self.inv_t_index}
         return data
 
-
-# class block_detection:
-#     def __init__(self, ecg_signal, fs):
-#         self.ecg_signal = ecg_signal
-#         self.fs = fs
-#         self.block_processing()
-
-#     def block_processing(self):
-#         self.baseline_signal, self.lowpass_signal = FilterSignal(self.ecg_signal, self.fs).get_data()
-#         pqrst_data = pqrst_detections(self.baseline_signal, fs=self.fs).get_data()
-#         self.r_index = pqrst_data["R_index"]
-#         self.q_index = pqrst_data["Q_Index"]
-#         self.s_index = pqrst_data["S_Index"]
-#         self.p_index = pqrst_data["P_Index"]
-#         self.hr_counts = pqrst_data["HR_Count"]
-#         self.p_t = pqrst_data["P_T List"]
-#         self.pr = pqrst_data["PR_Interval"]
-
-#     def third_degree_block_deetection(self):
-#         label= 'Abnormal'
-#         third_degree = []
-#         possible_3rd = possible_mob_3rd = False
-#         if self.hr_counts <= 100 and len(self.p_t) != 0: # 60 70
-#             constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
-#             cons_2_1 = all(len(inner_list) in {1, 2} for inner_list in self.p_t)
-#             ampli_val = list(map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list),self.p_t))
-#             count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
-#             percentage_above_threshold = count_above_threshold / len(ampli_val)
-#             count = 0
-#             if percentage_above_threshold >= 0.7:
-#                 inc_dec_count = 0
-#                 for i in range(0, len(self.pr)):
-#                     if self.pr[i] > self.pr[i -1]:
-#                         inc_dec_count += 1
-#                 if round(inc_dec_count / (len(self.pr)), 2) >= 0.50 and constant_2 == False: # if posibale to change more then 0.5
-#                     possible_mob_3rd = True
-#                 for inner_list in self.p_t:
-#                     if len(inner_list) in [3, 4] :
-#                         ampli_val = [self.baseline_signal[i] for i in inner_list] 
-#                         if ampli_val  and (sum(value > 0.05 for value in ampli_val) / len(ampli_val)) > 0.7: 
-#                             differences = np.diff(inner_list).tolist()
-#                             diff_list = [x for x in differences if x >= 70]
-#                             if len(diff_list) != 0:
-#                                 third_degree.append(1)
-#                             else:
-#                                 third_degree.append(0)    
-#                     elif len(inner_list) in [3,4] and possible_mob_3rd==True:
-#                         differences = np.diff(inner_list).tolist()
-#                         if all(diff > 70 for diff in differences):
-#                             third_degree.append(1)
-#                         else:
-#                             third_degree.append(0)
-#                     else:
-#                         third_degree.append(0)
-#         if len(third_degree) != 0:
-#             if third_degree.count(1) /len(third_degree) >= 0.4 or possible_mob_3rd: # 0.5 0.4   
-#                 label = "3rd Degree block"
-#         return label
-
-#     def second_degree_block_new(self):
-#         label= 'Abnormal'
-#         constant_3_peak = []
-#         possible_mob_1 = False
-#         possible_mob_2 = False
-#         mob_count = 0
-#         if self.hr_counts <= 100: # 80
-#             if len(self.p_t) != 0:
-#                 constant_2 = all(map(lambda innerlist: len(innerlist) == 2, self.p_t))
-#                 rhythm_flag = all(len(inner_list) in {1, 2, 3} for inner_list in self.p_t)
-#                 ampli_val = list(map(lambda inner_list: sum(self.baseline_signal[i] > 0.05 for i in inner_list) / len(inner_list), self.p_t))
-#                 count_above_threshold = sum(1 for value in ampli_val if value > 0.7)
-#                 percentage_above_threshold = count_above_threshold / len(ampli_val)
-#                 if percentage_above_threshold >= 0.7:
-#                     if rhythm_flag and constant_2 == False:
-#                         pr_interval = []
-#                         for i, r_element in enumerate(self.r_index[1:], start=1):
-#                             if i <= len(self.p_t):
-#                                 inner_list = self.p_t[i - 1]  
-#                                 last_element = inner_list[-1] 
-#                                 result = r_element - last_element 
-#                                 pr_interval.append(result)
-
-#                         counts = {}
-#                         count_2 = 0
-#                         for i in range(0, len(pr_interval)):
-#                             counts[i] = 1
-#                             if i in counts:
-#                                 counts[i] += 1
-#                             if pr_interval[i] > pr_interval[i -1]:
-#                                 count_2 += 1
-#                         most_frequent = max(counts.values())
-#                         if round(count_2 / (len(pr_interval)), 2) >= 0.50: 
-#                             possible_mob_1 = True
-#                         elif round(most_frequent / len(pr_interval), 2) >= 0.4: 
-#                             possible_mob_2 = True
-
-#                         for inner_list in self.p_t:
-#                             if len(inner_list) == 3 :
-#                                 differences = np.diff(inner_list).tolist()
-#                                 if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
-#                                     if possible_mob_1 or possible_mob_2:
-#                                         mob_count += 1
-#                                     else:
-#                                         constant_3_peak.append(1)
-#                             else:
-#                                 constant_3_peak.append(0)
-#                     else:
-#                         for inner_list in self.p_t:
-#                             if len(inner_list) == 3 :
-#                                 differences = np.diff(inner_list).tolist()
-#                                 if differences[0] <= 0.5 * differences[1] or differences[1] <= 0.5 * differences[0]:
-#                                     constant_3_peak.append(1)
-#                                 else:
-#                                     constant_3_peak.append(0)
-#                             else:
-#                                 constant_3_peak.append(0)
-#         if len(constant_3_peak) != 0 and constant_3_peak.count(1) != 0:
-
-#             if constant_3_peak.count(1) /len(constant_3_peak) >= 0.4: # 0.4 0.5
-#                 label = "Mobitz II"
-#         elif possible_mob_1 and mob_count > 1: # 0 1 4
-#             label = "Mobitz I"
-#         elif possible_mob_2 and mob_count > 1: # 0  4
-#             label = "Mobitz II"
-#         return label
-
-#     # Block new trans model for added 
-#     def prediction_model_block(self, input_arr):
-#         classes = ['1st_deg', '2nd_deg', '3rd_deg', 'abnormal', 'normal']
-#         input_arr = tf.io.decode_jpeg(tf.io.read_file(input_arr), channels=3)
-#         input_arr = tf.image.resize(input_arr, size=(224, 224), method=tf.image.ResizeMethod.BILINEAR)
-#         input_arr = (tf.expand_dims(input_arr, axis=0),)
-#         model_pred = predict_tflite_model(block_load_model, input_arr )[0]
-#         # print(model_pred)
-#         idx = np.argmax(model_pred)
-#         return model_pred, classes[idx]
-
-#     def check_block_model(self, low_ecg_signal):
-#         label = 'Abnormal'
-#         for i in glob.glob('temp_block_img' + "/*.jpg"):
-#             os.remove(i)
-        
-#         randome_number = random.randint(200000, 1000000)
-#         temp_img = low_ecg_signal
-#         plt.figure(layout="constrained")
-#         plt.plot(temp_img)
-#         plt.axis("off")
-#         plt.savefig(f"temp_block_img/p_{randome_number}.jpg")
-#         aq = cv2.imread(f"temp_block_img/p_{randome_number}.jpg")
-#         aq = cv2.resize(aq, (1080, 460))
-#         cv2.imwrite(f"temp_block_img/p_{randome_number}.jpg", aq)
-#         plt.close()
-#         ei_ti_label = []
-#         files = sorted(glob.glob("temp_block_img/*.jpg"), key=extract_number)
-#         for pvcfilename in files:
-#             predictions, ids = self.prediction_model_block(pvcfilename)
-#             # print(predictions, ids)
-#             label = "Abnormal" #"Normal"
-#             if str(ids) == "3rd_deg" and float(predictions[2]) > 0.78:
-#                 label = "3rd degree"
-#             if str(ids) == "2nd_deg" and float(predictions[1]) > 0.78:
-#                 label = "2nd degree"
-#             if str(ids) == "1st_deg" and float(predictions[0]) > 0.78:
-#                 label = "1st degree"
-
-#             if 0.40 < float(predictions[1]) < 0.70:
-#                 ei_ti_label.append('2nd degree')
-#             if 0.40 < float(predictions[0]) < 0.70:
-#                 ei_ti_label.append('1st degree')
-#             if 0.40 < float(predictions[2]) < 0.70:
-#                 ei_ti_label.append('3rd degree')
-#         return label, ei_ti_label, predictions
-
-class afib_flutter_detection:
+class AfibFlutterDetection:
     def __init__(self, ecg_signal, r_index, q_index,s_index,p_index,p_t,pr_interval, load_model):
         self.ecg_signal = ecg_signal
         self.r_index = r_index
@@ -3550,7 +2775,7 @@ class afib_flutter_detection:
 def afib_fultter_model_check(ecg_signal, load_model,  frequency,newsublist):
     baseline_signal, lowpass_signal = FilterSignal(ecg_signal, frequency).get_data()
 
-    pqrst_data = pqrst_detections(baseline_signal, fs=frequency).get_data()
+    pqrst_data = PqrstDetection(baseline_signal, fs=frequency).get_data()
     r_label = pqrst_data['R_Label']
     r_index = pqrst_data['R_index']
     q_index = pqrst_data['Q_Index']
@@ -3561,12 +2786,12 @@ def afib_fultter_model_check(ecg_signal, load_model,  frequency,newsublist):
     afib_per = 0
     flutter_per = 0
     final_perc = 0 
-    afib_flutter = afib_flutter_detection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model)
+    afib_flutter = AfibFlutterDetection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model)
     abs_afib_flutter_check = afib_flutter.abs_afib_flutter_check()
     ei_ti = []
     label = 'Abnormal'
     if abs_afib_flutter_check:
-        check_2nd_lead,afib_data_index, flutter_data_index = afib_flutter_detection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model).get_data(newsublist)
+        check_2nd_lead,afib_data_index, flutter_data_index = AfibFlutterDetection(lowpass_signal, r_index, q_index, s_index, p_index, p_t,pr_interval, load_model).get_data(newsublist)
         
         afib_per = int(check_2nd_lead['AFIB']*100)
         flutter_per = int(check_2nd_lead['FLUTTER']*100)
@@ -3590,52 +2815,6 @@ def afib_fultter_model_check(ecg_signal, load_model,  frequency,newsublist):
     else:
         label = "Abnormal"
         return label,ei_ti
-
-# Block new trans model, need to add 80/20 approach
-# def block_model_check(ecg_signal, frequency, abs_result):
-#     model_label = 'Abnormal'
-#     ei_ti_block = []
-    
-#     baseline_signal = baseline_construction_200(ecg_signal)
-#     lowpass_signal = lowpass(baseline_signal)
-#     get_block = block_detection(ecg_signal, frequency)
-     
-#     block_result, ei_ti_label, model_pre = get_block.check_block_model(lowpass_signal)
-#     if block_result == '1st degree' and abs_result != 'Abnormal':
-#         model_label = 'I DEGREE'
-#     if block_result == '2nd degree' and (abs_result == '' or abs_result == 'Mobitz II'):
-#         if abs_result=="Mobitz I":
-#             model_label = 'MOBITZ-I'
-#         if abs_result=="Mobitz II":
-#             model_label = 'MOBITZ-II'
-#     if block_result == '3rd degree' and abs_result!="Abnormal":
-#         model_label = 'III Degree'
-#     if ei_ti_label:
-#         if '1st degree' in ei_ti_label and abs_result!="Abnormal":
-#             model_label = 'I DEGREE'
-#             ei_ti_block.append({"Arrhythmia":"I DEGREE","percentage":model_pre[0]*100})
-#         if '2nd degree' in ei_ti_label and (abs_result == 'Mobitz I' or abs_result == 'Mobitz II'):
-#             if abs_result=="Mobitz I":
-#                 model_label = 'MOBITZ-I'
-#                 ei_ti_block.append({"Arrhythmia":"MOBITZ-I","percentage":model_pre[1]*100})
-#             if abs_result=="Mobitz II":
-#                 model_label = 'MOBITZ-II'
-#                 ei_ti_block.append({"Arrhythmia":"MOBITZ-II","percentage":model_pre[1]*100})
-#         if '3rd degree' in ei_ti_label and abs_result!="Abnormal":
-#             model_label = 'III Degree'
-#             ei_ti_block.append({"Arrhythmia":"III Degree","percentage":model_pre[2]*100})
-#     return model_label, ei_ti_block
-
-# def block_process(ecg_signal, frequency):
-#     abs_result = 'Abnormal'
-#     get_block = block_detection(ecg_signal, frequency)
-#     second_deg_check = get_block.second_degree_block_new()
-#     if second_deg_check != 'Abnormal':
-#         abs_result = second_deg_check
-#     if second_deg_check == 'Abnormal':
-#         third_deg_check = get_block.third_degree_block_deetection()
-#         abs_result = third_deg_check
-#     return abs_result
 
 def noise_check_again(ecg_signal):
     base1 = signal.detrend(ecg_signal)
@@ -4058,7 +3237,7 @@ def data_convert_MI(sorted_data, version): # patient_id, path=None
                     kk+=1
                     if stop> len(A2[i]):
                         break
-            elif self.lead_12:
+            elif version == 8:
                 while True:
                     l = A2[i][start:stop]
                     l1 = A1[i][start:stop]
@@ -4168,15 +3347,12 @@ def data_convert_MI(sorted_data, version): # patient_id, path=None
         # print('I:', len(data_dict["I"]), "II:", len(data_dict["II"]),  "III:",len(data_dict["III"]),  "aVR:", len(data_dict["aVR"]),"aVL:", len(data_dict["aVL"]),  "aVF:", len(data_dict["aVF"]), "v5: ", len(data_dict["v5"]))
         df = pd.DataFrame(data_dict)
     else:
-        print("Lead II data")
+        print("Error in raw data convert......")
 
     if tog_arr == 0:
         return df
 
     return df
-
-
-
 
 def rrirrAB(rpeaks):
     rpeak_diff = np.diff(rpeaks)
@@ -4196,29 +3372,6 @@ def rrirrAB(rpeaks):
     else:
         label = "REGULAR"
     return label
-
-def SACompareShort(list1, val1,val2):
-    l=[]
-    for x in list1:
-        if x>=val1 and x<=val2:
-            l.append(1)
-        else:
-            l.append(0)
-    if 1 in l:
-        return True
-    else:
-        return False
-
-    
-def findFile(name , path):
-    try:
-        if name in os.listdir(path):
-            return True
-        else:
-            return False
-    except:
-        return False
-
 
 def butter_bandpass_filterdd(data, lowcut, highcut, fs, order=4):
     nyquist = 0.5 * fs
@@ -4325,215 +3478,6 @@ class PVCDetection:
         self.date_time = date_time
         self.patientid = patientid
 
-    # def pvc_count_finds(self, bb, HR):
-    #     # Bigem
-    #     bigem = []
-    #     bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count  = 0, 0, 0, 0, 0, 0, 0, 0
-    #     for q,k in enumerate(bb):
-    #         if len(bigem) == 3:
-    #             bigem_count+=1
-    #             try:
-    #                 if bb[q] ==0 and bb[q+1]==1:
-    #                     bigem.clear()
-    #                     bigem.append(1)
-    #                 else:
-    #                     bigem.clear()
-    #             except:
-    #                 bigem.clear()
-    #         if len(bigem ) ==0 and k ==1:
-    #             bigem.append(1)
-    #         elif len(bigem) ==1 and k ==0:
-
-    #             bigem.append(0)
-    #         elif len(bigem) ==2 and k ==1:
-    #             bigem.append(1)
-    #         else:
-    #             if len(bigem)==1 and (1 in bigem) and k==1:
-    #                 bigem.clear()
-    #                 bigem.append(1)
-    #             elif len(bigem)>1: 
-    #                 bigem.clear()
-    #                 if k ==1:
-    #                     bigem.append(1)                                                    
-    #     if len(bigem) == 3:
-    #         bigem_count+=1
-    #         bigem.clear()
-
-    #     # Trigeminy 
-    #     Trigem = []
-    #     Trigem_count = 0
-    #     for m,l in enumerate(bb):
-    #         if len(Trigem) == 4:
-    #             Trigem_count+=1
-    #             try:
-    #                 if bb[m] ==0 and bb[m+1]==0 and bb[m+2]==1:
-    #                     Trigem.clear()
-    #                     Trigem.append(1)
-    #                 else:
-    #                     Trigem.clear()
-    #             except:
-    #                 Trigem.clear()
-
-    #         if len(Trigem) ==0 and l ==1:
-    #             Trigem.append(1)
-    #         elif len(Trigem) ==1 and l ==0:
-    #             Trigem.append(0)
-    #         elif len(Trigem) ==2 and l ==0:
-    #             Trigem.append(0)
-    #         elif len(Trigem) ==3 and l ==1:
-    #             Trigem.append(1)
-    #         else:
-    #             if len(Trigem)==1 and (1 in Trigem) and l==1:
-    #                 Trigem.clear()
-    #                 Trigem.append(1)
-    #             elif len(Trigem)>1: 
-    #                 Trigem.clear()
-    #                 if l ==1:
-    #                     Trigem.append(1)
-    #     if len(Trigem) == 4:
-    #         Trigem_count+=1
-    #         Trigem.clear()
-
-    #     # Quadrageminy
-    #     Quadgem = []
-    #     Quadgem_count = 0
-    #     for p,o in enumerate(bb):
-    #         if len(Quadgem) == 5:
-    #             Quadgem_count+=1
-    #             try:
-    #                 if bb[p] ==0 and bb[p+1]==0 and bb[p+2]==0 and bb[p+3]==1:
-    #                     Quadgem.clear()
-    #                     Quadgem.append(1)
-    #                 else:
-    #                     Quadgem.clear()
-    #             except:
-    #                 Quadgem.clear()
-    #         if len(Quadgem) ==0 and o ==1:
-    #             Quadgem.append(1)
-    #         elif len(Quadgem) ==1 and o ==0:   
-    #             Quadgem.append(0)
-    #         elif len(Quadgem) ==2 and o ==0:
-    #             Quadgem.append(0)
-    #         elif len(Quadgem) ==3 and o ==0:
-    #             Quadgem.append(0)
-    #         elif len(Quadgem) ==4 and o ==1:
-    #             Quadgem.append(1)
-    #         else:
-    #             if len(Quadgem)==1 and (o in Quadgem) and o==1:
-    #                 Quadgem.clear()
-    #                 Quadgem.append(1)
-    #             elif len(Quadgem)>1: 
-    #                 Quadgem.clear()
-    #                 if o ==1:
-    #                     Quadgem.append(1)
-    #     if len(Quadgem) == 5:
-    #         Quadgem_count+=1
-    #         Quadgem.clear()
-
-    #     ll=bb
-    #     couplet = []
-    #     c_count=0
-    #     for i in ll:
-    #         if i==1:
-    #             couplet.append(1)
-    #             if len(couplet)==3:
-    #                 c_count-=1
-    #                 couplet.clear()
-
-    #             if len(couplet)==2: 
-    #                 c_count+=1
-                    
-    #             if 0 in couplet:
-    #                 if c_count==0:
-    #                     pass
-    #                 else:
-    #                     c_count-=1
-    #                 couplet.clear()
-    #         else:
-    #             couplet.clear()
-
-    #     triplet = []
-    #     t_count=0
-    #     for i in ll:
-    #         if i==1:
-    #             triplet.append(1)
-    #             if len(triplet)>=4:
-    #                 t_count-=1
-    #                 triplet.clear()
-    #             if len(triplet)==3:
-    #                 t_count+=1
-
-    #             if 0 in triplet:
-    #                 if t_count==0:
-    #                     pass
-    #                 else:
-    #                     t_count-=1
-    #                 triplet.clear()
-    #         else:
-    #             triplet.clear()
-
-    #     if int(HR)>100:
-    #         vt = []
-    #         vt_count=0
-    #         for i in ll:
-    #             if i==1:
-    #                 vt.append(1)
-    #                 if len(vt)>=4:
-    #                     vt_count+=1
-    #                     vt.clear()
-    #                 if 0 in vt:
-    #                     if vt_count==0:
-    #                         pass
-    #                     else:
-    #                         vt_count-=1
-    #                     vt.clear()
-    #             else:
-    #                 vt.clear()
-
-    #     if int(HR)>60 and int(HR)<=300:
-    #         aivr = []
-    #         aivr_count=0
-    #         for i in ll:
-    #             if i==1:
-    #                 aivr.append(1)
-    #                 if len(aivr)>=4:
-    #                     aivr_count+=1
-    #                     aivr.clear()
-    #                 if 0 in aivr:
-    #                     if aivr_count==0:
-    #                         pass
-    #                     else:
-    #                         aivr_count-=1
-    #                     aivr.clear()     
-    #             else:
-    #                 aivr.clear()
-    #     if int(HR)<=60:
-    #         ivr = []
-    #         ivr_count=0
-    #         for i in ll:
-    #             if i==1:
-    #                 ivr.append(1)
-    #                 if len(ivr)>=4:
-    #                     ivr_count+=1
-    #                     ivr.clear()
-    #                 if 0 in ivr:
-    #                     if ivr_count==0:
-    #                         pass
-    #                     else:
-    #                         ivr_count-=1
-    #                     ivr.clear()
-    #             else:
-    #                 ivr.clear()
-    #     total_one = (1*vt_count) + (c_count*2)+ (t_count*3)+ (bigem_count*2)+ (Trigem_count*2)+ (Quadgem_count*2)
-    #     total = bigem_count+ Trigem_count+ Quadgem_count+ c_count+ t_count+ vt_count+ aivr_count+ ivr_count
-    #     ones = bb.count(1)
-    #     if total == 0:
-    #         Isolated = ones
-    #     else:
-    #         Common = total-1
-    #         Isolated = ones-(total_one-Common)
-    #     return  bigem_count, Trigem_count, Quadgem_count, c_count, t_count, vt_count, aivr_count, ivr_count, Isolated
-
     def pvc_count_finds(self, sequence, HR):
         triplet_pattern = [1, 1, 1]
         couplet_pattern = [1, 1]
@@ -4570,10 +3514,6 @@ class PVCDetection:
                     nsvt_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
-#                elif length >= 4 and (int(HR)>60 and int(HR)<=100):
-#                    aivr_count += 1
-#                    for j in range(start, i):
-#                      beat_indices.add(j)
                 elif length >= 13 and int(HR)>100:
                     vt_count += 1
                     for j in range(start, i):
@@ -4651,8 +3591,6 @@ class PVCDetection:
             "VT": vt_count,
             "Total Beats": total_beats
         }
-
-    
 
     def get_pvc_data(self):
         print("---------------- PVC detection --------------------")
@@ -5125,7 +4063,7 @@ class BlockDetected:
 
     def block_processing(self):
         self.baseline_signal, self.lowpass_signal = FilterSignal(self.ecg_signal, self.fs).get_data()
-        pqrst_data = pqrst_detections(self.baseline_signal, fs=self.fs).get_data()
+        pqrst_data = PqrstDetection(self.baseline_signal, fs=self.fs).get_data()
         self.r_index = pqrst_data["R_index"]
         self.q_index = pqrst_data["Q_Index"]
         self.s_index = pqrst_data["S_Index"]
@@ -5737,8 +4675,6 @@ def subscribe(client: mqtt_client):
                     except:
                         naa = np.array(OriginalSignal)
                         
-                    # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
-                    # final_label = check_vfib_vfl_model(naa, vfib_vfl_model)
                     final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
 
                     BloodPressure_check = BloodPressure(naa)
@@ -5778,9 +4714,9 @@ def subscribe(client: mqtt_client):
 
                                 client.publish(topic_y,json.dumps(result_data),qos=2)
                         except Exception as e:
-                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                print("LOG6:",result_data,e)
-                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"nibp":{},"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
+                            print("LOG6:",result_data,e)
+                            client.publish(topic_y,json.dumps(result_data),qos=2)
 
 
                     elif "ASYS" in final_label  and int(timetaken)>=5:
@@ -5864,14 +4800,10 @@ def subscribe(client: mqtt_client):
                                 br,hrv = 0,[]
 
                             r_index = rpeaks
-
-
                             b_es = baseline_construction_200(newdada,101)
                             low_es = lowpass(b_es)
                             r = list(r_index)
                             r_index = np.array(r)
-                            # s_index = find_s_indexs(b_es,r_index,20)
-                            # q_index = find_q_indexs(b_es, r_index, 15)
                             j_index = find_j_indexs(b_es,s_index)
                             wideqrs=[]
                             for iii in range(len(q_index)-1):
@@ -5913,7 +4845,7 @@ def subscribe(client: mqtt_client):
                                     _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
                                     signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="cwt")
                             except Exception as ee:
-                                    print("neurokit2 Error:",ee)
+                                print("neurokit2 Error:",ee)
 
                             rrint = rrirrAB(rpeaks)
                             RRintervallist = []
@@ -6100,11 +5032,6 @@ def subscribe(client: mqtt_client):
                             patientid = dd["patient"]
                             layer2 = newpvcs
                             print(layer2)
-                            # all_lead_data = {}
-                            # if version == 5:
-                            #     all_lead_data = data_convert_MI(sorted_data)
-                            # elif version == 2:
-                            #     all_lead_data = pd.DataFrame({'II': OriginalSignal})
                             if 1 in layer2:
                                 if os.path.exists("pvcs/"+patientid):
                                     pass
@@ -6146,9 +5073,9 @@ def subscribe(client: mqtt_client):
                                         if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
                                             result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
-#                                    if float(HR)>60.0 and float(HR)<=100.0:
-#                                        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
-#                                            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                #    if float(HR)>60.0 and float(HR)<=100.0:
+                                #        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
+                                #            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
                                     
                                     if float(HR)<=100.0:
                                         if "PVC-Ivr" in pvc_label: #ivr_count>=1:
@@ -6248,9 +5175,6 @@ def subscribe(client: mqtt_client):
                                 
                             if (result_data['Arrhythmia']=='BR' or result_data['Arrhythmia']=='Short Pause' or result_data['Arrhythmia']=='Normal' or result_data['Arrhythmia']=='') and int(HR)<80 and int(timetaken)>=7:
                                 try:
-                                    # block_na = lowpass_11(naa)
-                                    # labelss = block_process(block_na, 200
-                                    # final_label,ei_ti_block = block_model_check(block_na, 200, labelss)
                                     block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
                                     final_label = block_results['block_label']
                                     ei_ti_block = block_results['ei_ti_label']
@@ -6285,9 +5209,9 @@ def subscribe(client: mqtt_client):
 
 
                             if result_data['Arrhythmia']=='' and rrint == "IRREGULAR":
-                                    result_data.update({"Arrhythmia":'SINUS-ARR'})
-                                    d3 = result_data
-                                    finddata.append(d3)
+                                result_data.update({"Arrhythmia":'SINUS-ARR'})
+                                d3 = result_data
+                                finddata.append(d3)
 
                             if (result_data['Arrhythmia']=='Normal' or rrint=="REGULAR") and int(HR)<100 and int(timetaken)>8:
                                 try:
@@ -6331,12 +5255,10 @@ def subscribe(client: mqtt_client):
                                             d3 = result_data
                                             finddata.append(d3)
 
-
                                         if pace_label == "Ventricular_Pacemaker":
                                             result_data.update({"VENTRICULAR_PACEMAKER":True})
                                             d3 = result_data
                                             finddata.append(d3)
-
 
                                         if pace_label == "Atrial_&_Ventricular_pacemaker":
                                             result_data.update({"AV_PACEMAKER":True})
