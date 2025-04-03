@@ -3615,7 +3615,7 @@ class PVCDetection:
         
         if len(all_lead_data) != 0:
             if self.is_lead == 8:
-                analysis_leads = ['I','II','III', 'v1', 'v5']
+                analysis_leads = ['I','II','III', 'v1', 'v5', 'v6']
             elif self.is_lead == 5:
                 analysis_leads = ['I','II','III']
             else:
@@ -3684,7 +3684,7 @@ class PVCDetection:
                             for_lbbb_rbbb_leads = ['I', 'aVL', 'V5']
                         elif self.is_lead == 8:
                             for_pvc_leads = ['I','II','III', 'v1', 'v5']
-                            for_lbbb_rbbb_leads = ['I', 'aVL', 'v1', 'v5','v6'] 
+                            for_lbbb_rbbb_leads = ['I', 'aVL', 'v1','v6'] 
                         else:
                             for_pvc_leads = ['II']
                             for_lbbb_rbbb_leads = []
@@ -3862,17 +3862,21 @@ class PACDetection:
                 lead_data['hr'] = hr
                 lead_data['R_label'] = R_label
                 updated_union, pac_detect, junc_detect, junc_union =[], [],[], []
-                for i in range(len(r_index)-1):
-                    m=r_index[i+1]-r_index[i]
-                    apeds.append(m*5/1000)
+                if r_index:
+                    for i in range(len(r_index)-1):
+                        m=r_index[i+1]-r_index[i]
+                        apeds.append(m*5/1000)
 
                 variations=[]
                 for i in range(len(apeds)-1):
                     variations.append(get_percentage_diff(apeds[i+1],apeds[i]))
-
-                forPAC = Average(variations) 
+                
+                if variations:
+                  forPAC = Average(variations) 
+                else:
+                  forPAC = 0.0
                 lead_data['forPAC'] = forPAC                  
-                if Average(variations)<0.20:
+                if forPAC <0.20: # Average(variations)
                     updated_union=[0,0,0,0,0,0,0,0]
                     lead_data['updated_union'] = updated_union
                     lead_data['junctional_label'] = junctional_label
@@ -3974,12 +3978,12 @@ class PACDetection:
                     results_pac['pac_index'] = all_lead_pac_data[pac_matching_keys[0]]['pac_detect']
                     results_pac['pac_union'] = all_lead_pac_data[pac_matching_keys[0]]['updated_union']
                     results_pac['pac_counts']= all_lead_pac_data[pac_matching_keys[0]]['pac_counts']
-                    results_pac['variations'] = all_lead_pac_data[pac_matching_keys[0]]['variations']
+                    results_pac['forPAC'] = all_lead_pac_data[pac_matching_keys[0]]['forPAC']
                 else:
                     results_pac['pac_index'] = []
                     results_pac['pac_union'] = []
                     results_pac['pac_counts'] = {}
-                    results_pac['variations'] = []
+                    results_pac['forPAC'] = []
                 
                 results_pac['pac_label'] = pvc_final_label
                 results_pac['jnc_label'] = jnc_label
@@ -3990,7 +3994,7 @@ class PACDetection:
                 results_pac['pac_label'] =all_lead_pac_data['II']['pac_label']
                 results_pac['jnc_label'] = all_lead_pac_data['II']['junctional_label']
                 results_pac['pac_counts']= all_lead_pac_data['II']['pac_counts']
-                results_pac['variations'] = all_lead_pac_data['II']['variations']
+                results_pac['forPAC'] = all_lead_pac_data['II']['forPAC']
         return results_pac
    
     def pac_count_find(self, PAC_R_Peaks, hr_counts):
@@ -4581,12 +4585,14 @@ def subscribe(client: mqtt_client):
                 elif (loss_data > 800).any():
                     print(loss_data)
                     result_data["Arrhythmia"] = "Artifacts"
+                    result_data["HR"] = 0
                     publish_list = [result_data]
                     print("LOG:",publish_list)
                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                 elif final_output == "high_noise":
                     print("GPT Output")
                     result_data["Arrhythmia"] = "Artifacts"
+                    result_data["HR"] = 0
                     publish_list = [result_data]
                     print("LOG:",publish_list)
                     client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -4714,20 +4720,20 @@ def subscribe(client: mqtt_client):
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                                 else:
-                                    result_data.update({"Arrhythmia":'Normal',"HR":str(HRs)})
+                                    result_data.update({"Arrhythmia":'Normal',"HR":int(HRs)})
                                     d1 = result_data
                                     finddata.append(d1)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                                 
                             elif int(HR)>100 and noise_cc == "Normal":
-                                result_data.update({"Arrhythmia":'Normal'})
+                                result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
                                 d2 = result_data
                                 finddata.append(d2)
                                 newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                 client.publish(topic_y,json.dumps(newdata),qos=2)
                             elif rrint=="IRREGULAR":
-                                result_data.update({"Arrhythmia":'ABNORMAL'})
+                                result_data.update({"Arrhythmia":'ABNORMAL', "HR": int(HR)})
                                 d1 = result_data
                                 finddata.append(d1)
                                 newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
@@ -4741,13 +4747,13 @@ def subscribe(client: mqtt_client):
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                                 elif int(HR)>100 and noise_cc != "Normal":
-                                    result_data.update({"Arrhythmia":'Artifacts'})
+                                    result_data.update({"Arrhythmia":'Artifacts', "HR": 0})
                                     d2 = result_data
                                     finddata.append(d2)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                                 else:
-                                    result_data.update({"Arrhythmia":'Normal'})
+                                    result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
                                     d1 = result_data
                                     finddata.append(d1)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
@@ -4811,6 +4817,7 @@ def subscribe(client: mqtt_client):
                                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                                 else:
                                     result_data["Arrhythmia"]='VFIB'
+                                    result_data['HR'] = int(HR)
                                     result_data["HRV"]:hrv
                                     result_data["RR"]:br
                                     result_data["templateBeat"]:beats
@@ -4831,6 +4838,7 @@ def subscribe(client: mqtt_client):
                                 client.publish(topic_y,json.dumps(publish_list),qos=2)
                         elif "ASYS" in final_label  and int(timetaken)>=5:
                             result_data["Arrhythmia"] = 'ASYSTOLE'
+                            result_data["HR"]= 0
                             result_data["HRV"]:[]
                             result_data["RR"]:0
                             publish_list = [result_data]
@@ -4859,7 +4867,7 @@ def subscribe(client: mqtt_client):
                             result_data["PACTOTALCOUNT"]=0
                             try:                               
                                 if HR>60 and HR<100:
-                                    result_data["HR"] = HR
+                                    result_data["HR"] = int(HR)
                                     result_data["Arrhythmia"] ='Normal'
                                     result_data["templateBeat"]= beats
                                     
@@ -4878,8 +4886,8 @@ def subscribe(client: mqtt_client):
                             except Exception as e:
                                 result_data["HR"]=0
                                 result_data["Arrhythmia"]='Artifacts' 
-                                result_data["HRV"]=[],
-                                result_data["RR"]=0,
+                                result_data["HRV"]=[]
+                                result_data["RR"]=0
                                 publish_list = [result_data]
                                 print("LOG7:",publish_list,e)
                                 client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -4950,7 +4958,7 @@ def subscribe(client: mqtt_client):
                                             pass
                                         else:
                                             if newafib == "Aflutter": # int(HR)>=62
-                                                result_data.update({"Arrhythmia":'AFL',"PRInterval":"0","HR":str(HR)})
+                                                result_data.update({"Arrhythmia":'AFL',"PRInterval":"0","HR":int(HR)})
                                                 last_label_afl = ''
                                                 for ei_ti_afib_afl in ei_ti:
                                                     if last_label_afl!="Aflutter":
@@ -4960,7 +4968,7 @@ def subscribe(client: mqtt_client):
                                                 finddata.append(d4)
                                             if rrints == "IRREGULAR" and rrint=="IRREGULAR":
                                                 if newafib == "Afib":
-                                                    result_data.update({"Arrhythmia":'AFIB',"PRInterval":"0","HR":str(HR)})
+                                                    result_data.update({"Arrhythmia":'AFIB',"PRInterval":"0","HR":int(HR)})
                                                     last_label = ''
                                                     for ei_ti_afib_afl in ei_ti:
                                                         if last_label!='afib':
@@ -4970,7 +4978,7 @@ def subscribe(client: mqtt_client):
                                                     finddata.append(d4)
                                                 
                                                 if newafib == "Abnormal":
-                                                    result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":str(HR)})
+                                                    result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":int(HR)})
                                                     d4 = result_data
                                                     finddata.append(d4)
                                     except Exception as e:
@@ -4978,7 +4986,7 @@ def subscribe(client: mqtt_client):
 
                                 if float(HR)<60 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and result_data["Arrhythmia"]!="ABNORMAL":
                                     if(SACompare(SAf, 5000)) and (rrints == "IRREGULAR" or rrints == "REGULAR"):
-                                        result_data.update({"Arrhythmia":'Long Pause'})
+                                        result_data.update({"Arrhythmia":'Long Pause', "HR": int(HR)})
                                         d1 = result_data
                                         finddata.append(d1)
                                     else:
@@ -4989,16 +4997,16 @@ def subscribe(client: mqtt_client):
                                         if HRs>=60 and HRss>=60:
                                             pass
                                         elif rrints == "IRREGULAR" and rrint=="IRREGULAR" and result_data["Arrhythmia"]!="Long Pause":
-                                            result_data.update({"Arrhythmia":'SINUS-ARR',"HR":str(HRs)})
+                                            result_data.update({"Arrhythmia":'SINUS-ARR',"HR":int(HRs)})
                                             d1 = result_data
                                             finddata.append(d1)
                                         else:
-                                            result_data.update({"Arrhythmia":'BR',"HR":str(HRs)})
+                                            result_data.update({"Arrhythmia":'BR',"HR":int(HRs)})
                                             d1 = result_data
                                             finddata.append(d1)
                                 
                                 if float(HR)>100 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and rrints != "IRREGULAR" and rrint != "IRREGULAR":
-                                    result_data.update({"Arrhythmia":'TC'})
+                                    result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
                                     d2 = result_data
                                     finddata.append(d2)
 
@@ -5014,7 +5022,7 @@ def subscribe(client: mqtt_client):
                                     else:
                                         noofpause = 0
 
-                                    result_data.update({"Arrhythmia":'Long Pause',"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>5000]})
+                                    result_data.update({"Arrhythmia":'Long Pause', "HR": int(HR),"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>5000]})
                                     d1 = result_data
                                     finddata.append(d1)
                                 if SACompareShort(SAf,2000,2900):
@@ -5029,7 +5037,7 @@ def subscribe(client: mqtt_client):
                                     else:
                                         noofpause = 0
 
-                                    result_data.update({"Arrhythmia":'Short Pause',"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
+                                    result_data.update({"Arrhythmia":'Short Pause', "HR": int(HR),"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
                                     d1 = result_data
                                     finddata.append(d1)
 
@@ -5083,11 +5091,11 @@ def subscribe(client: mqtt_client):
                                                 result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
                                     elif lbbb_rbbb_label and int(version) in [5, 8] and 1 in newpvcswide and int(HR)<100:
                                         if lbbb_rbbb_label == "LBBB":
-                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
+                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB", "HR": int(HR)})
                                             d3 = result_data
                                             finddata.append(d3)
                                         elif lbbb_rbbb_label == "RBBB":
-                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
+                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB", "HR": int(HR)})
                                             d3 = result_data
                                             finddata.append(d3)
                                     else:
@@ -5116,8 +5124,8 @@ def subscribe(client: mqtt_client):
                                         pac_label = pac_detection_result['pac_label']
                                     if 'pac_counts' in pac_detection_result:
                                         pac_counts = pac_detection_result['pac_counts']
-                                    if 'variations' in pac_detection_result:
-                                        forPAC = Average(pac_detection_result['variations'])
+                                    if 'forPAC' in pac_detection_result:
+                                        forPAC = pac_detection_result['forPAC']
                                     if 'jnc_label' in pac_detection_result:
                                         jr_label = pac_detection_result['jnc_label']
                                     
@@ -5163,23 +5171,23 @@ def subscribe(client: mqtt_client):
                                     try:
                                         jnrhy = jr_label
                                         if jnrhy=="Junctional_Rhythm":
-                                            result_data.update({"Arrhythmia":'JN-RHY'})
+                                            result_data.update({"Arrhythmia":'JN-RHY', "HR": int(HR)})
                                             d3 = result_data
                                             finddata.append(d3)
                                         elif jnrhy=="Junctional_Bradycardia":                                
-                                            result_data.update({"Arrhythmia":'JN-BR'})
+                                            result_data.update({"Arrhythmia":'JN-BR', "HR": int(HR)})
                                             d3 = result_data
                                             finddata.append(d3)
                                     except:
                                         print("JN ISSUE")
 
                                 if float(HR)>100 and result_data["Arrhythmia"]=="":
-                                    result_data.update({"Arrhythmia":'TC'})
+                                    result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
                                     d2 = result_data
                                     finddata.append(d2)
 
                                 if result_data['Arrhythmia']=='' and rrint == "REGULAR":
-                                    result_data.update({"Arrhythmia":'Normal'})
+                                    result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
                                     d3 = result_data
                                     finddata.append(d3)
                                     
@@ -5189,19 +5197,19 @@ def subscribe(client: mqtt_client):
                                         final_label = block_results['block_label']
                                         ei_ti_block = block_results['ei_ti_label']
                                         if final_label == "III Degree": 
-                                            result_data.update({"Arrhythmia":'III Degree'})
+                                            result_data.update({"Arrhythmia":'III Degree', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                 result_data["threeLatter"].append(ei_ti_blockdata)
                                             d3 = result_data
                                             finddata.append(d3)
                                         elif final_label == "MOBITZ-I":
-                                            result_data.update({"Arrhythmia":'MOBITZ-I'})
+                                            result_data.update({"Arrhythmia":'MOBITZ-I', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                 result_data["threeLatter"].append(ei_ti_blockdata)
                                             d3 = result_data
                                             finddata.append(d3)
                                         elif final_label == "MOBITZ-II":
-                                            result_data.update({"Arrhythmia":'MOBITZ-II'})
+                                            result_data.update({"Arrhythmia":'MOBITZ-II', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                     result_data["threeLatter"].append(ei_ti_blockdata)
                                             d3 = result_data
@@ -5209,7 +5217,7 @@ def subscribe(client: mqtt_client):
 
                                         else:
                                             if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","WIDE-QRS","SVT",'PAC-Triplet','PAC-Couplet','PAC-Bigeminy','PAC-Trigeminy','PAC-Quadrigeminy','PAC-Isolated','ABNORMAL','Long Pause','Short Pause'] and rrint == "IRREGULAR":
-                                                result_data.update({"Arrhythmia":'SINUS-ARR'})
+                                                result_data.update({"Arrhythmia":'SINUS-ARR', "HR": int(HR)})
                                                 d3 = result_data
                                                 finddata.append(d3)
 
@@ -5218,7 +5226,7 @@ def subscribe(client: mqtt_client):
 
 
                                 if result_data['Arrhythmia']=='' and rrint == "IRREGULAR":
-                                    result_data.update({"Arrhythmia":'SINUS-ARR'})
+                                    result_data.update({"Arrhythmia":'SINUS-ARR', "HR": int(HR)})
                                     d3 = result_data
                                     finddata.append(d3)
 
@@ -5246,7 +5254,7 @@ def subscribe(client: mqtt_client):
                                                 firstblockfinal.append(findtime)
 
                                         if len(firstblockfinal)>5:
-                                            result_data.update({"Arrhythmia":'I DEGREE',"PRInterval":firstblockfinal[0]})
+                                            result_data.update({"Arrhythmia":'I DEGREE',"PRInterval":firstblockfinal[0], "HR":int(HR)})
                                             d3 = result_data
                                             finddata.append(d3)
                                         else:
@@ -5285,40 +5293,40 @@ def subscribe(client: mqtt_client):
                                         if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
                                             label_mi = check_mi_model(all_lead_data, imageresource)
                                             if label_mi == "Inferior STEMI":
-                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Inferior MI"})
+                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Inferior MI", "HR": int(HR)})
                                                 d3 = result_data
                                                 finddata.append(d3)
                                             elif label_mi == "Lateral STEMI":
-                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Lateral MI"})
+                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Lateral MI", "HR": int(HR)})
                                                 d3 = result_data
                                                 finddata.append(d3)
                                             elif label_mi == "T_wave_Abnormality":
-                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"T wave Abnormality"})
+                                                result_data.update({"Arrhythmia":'ABNORMAL',"MI":"T wave Abnormality", "HR": int(HR)})
                                                 d3 = result_data
                                                 finddata.append(d3)
                                 except Exception as e:
                                     print("Error in MI",e)
 
                                 if result_data['Arrhythmia']=='' and int(HR)>100:
-                                        result_data.update({"Arrhythmia":'TC'})
-                                        d3 = result_data
-                                        finddata.append(d3)
+                                    result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
+                                    d3 = result_data
+                                    finddata.append(d3)
                                     
-                                if result_data['Arrhythmia']=='' and int(HR)<60:
-                                        result_data.update({"Arrhythmia":'BR'})
-                                        d3 = result_data
-                                        finddata.append(d3)
+                                if result_data['Arrhythmia']=='' and 15 < int(HR) < 60:
+                                    result_data.update({"Arrhythmia":'BR', "HR": int(HR)})
+                                    d3 = result_data
+                                    finddata.append(d3)
                                     
                                 if result_data['Arrhythmia']=='' and int(HR)>60 and int(HR)<100:
-                                        result_data.update({"Arrhythmia":'Normal'})
-                                        d3 = result_data
-                                        finddata.append(d3)
+                                    result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
+                                    d3 = result_data
+                                    finddata.append(d3)
 
                                 newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
 
                                 print("LOG:",newdata)
                                 if allarr == 'All-Arrhythmia':
-                                    if int(result_data['HR'])<=20:
+                                    if int(result_data['HR'])<=20 or result_data['Arrhythmia']=='':
                                         print("HR<20 issue", result_data['HR'])
                                         result_data["HR"]= 0
                                         result_data["Arrhythmia"]='Artifacts'

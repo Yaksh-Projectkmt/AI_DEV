@@ -5037,6 +5037,7 @@ def subscribe(client):
                         datetimee.append(seconddata[i]['dateTime']) 
                         newlist.append(seconddata[i]['data'])
                         leadlist.append(seconddata[i]['lead'])
+
                     allstring = ''.join(newlist)
                     print("DATALENGHT:",datalength)  
                     for i in allstring:
@@ -5075,7 +5076,7 @@ def subscribe(client):
                         fs = 200
                         all_lead_data = {}
                         if int(version) == 5 or int(version) == 8:
-                            all_lead_data = raw_data_to_voltage_convert(sorted_data, int(version))
+                            all_lead_data = data_convert_MI(sorted_data, int(version))
                         elif int(version) == 2:
                             all_lead_data = pd.DataFrame({'II': OriginalSignal})
                         final_output = noise_engine(all_lead_data, int(version))
@@ -5092,6 +5093,48 @@ def subscribe(client):
                         print("timetakenFinal:",timetaken)
                         loss_data = np.diff(datetimee)
                         print("EPOCH",datetimee)
+
+                        result_data = {
+                            "patient":dd["patient"],
+                            "HR":0, 
+                            "starttime":mintime,
+                            "endtime":maxtime,
+                            "Arrhythmia":'',
+                            'kit':dd["kit"],
+                            'position':positionFinal,
+                            "beats":0,
+                            "RRInterval":0,
+                            "PRInterval":0,
+                            "QTInterval":0,
+                            "QRSComplex":0,
+                            "STseg":0,
+                            "PRseg":0,
+                            "Vbeats":0,
+                            "noOfPause":0,
+                            "noOfPauseList":[],
+                            "ISOLATEDCOUNT":0,
+                            "COUPLETCOUNT":0,
+                            "TRIPLETCOUNT":0,
+                            "PACTRIPLETCOUNT":0,
+                            "PACCOUPLETCOUNT":0,
+                            "ISOPAC":0,
+                            "PACTOTALCOUNT":0,
+                            "ecgPackage":allarr,
+                            "trigger":trigger,
+                            "rpmId":rpmId,
+                            "version":version,
+                            "patientData":patientData,
+                            "coordinates":coordinates,
+                            "datalength":datalength,
+                            "HRV":[],
+                            "RR":0,
+                            "offline":True,
+                            "battery":battery ,
+                            "memoryUtilized": memoryUtilized,
+                            "sysncDataReaming":sysncDataReaming,
+                            "mobileBaterry":mobileBaterry
+                        }
+
                         if timetaken<4:
                             print("Data less than 2 second, half beat solution")
                         elif (loss_data > 60000).any():
@@ -5100,864 +5143,810 @@ def subscribe(client):
                             print("Data Greter than 50 second, Artifacts solution")
                         else:
                             if (loss_data > 800).any():
-                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                print("LOG:",result_data)
-                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                                result_data["Arrhythmia"] = "Artifacts"
+                                result_data['HR']=0
+                                publish_list = [result_data]
+                                print("LOG:",publish_list)
+                                client.publish(topic_y,json.dumps(publish_list),qos=2)
 
                             elif final_output == "high_noise":
                                 print("GPT Output")
-                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"offline":True,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                print("LOG:",result_data)
-                                client.publish(topic_y,json.dumps(result_data),qos=2)
-                                
-                            elif dd['ecgPackage']=="Free":
-                                print("Free")
-                                try:
-                                    fa=200
-                                    naa = np.array(OriginalSignal)
-                                    rpeaks = detect_beats(naa, float(fa))
-                                    try:
-                                        br,hrv = BPM(rpeaks)
-                                    except:
-                                        br,hrv = 0,[]
-                                    
-                                    HR = int(60*int(len(rpeaks))/(timetaken))
-                                    _, waves_peak = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="peak")
-                                    signal_dwt, waves_dwt = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="dwt")
-                                    RRintervallist=[]
-                                    for i in rpeaks:
-                                        RRintervallist.append(i)
-                                    SAf = []
-                                    RRpeaks="0"
-                                    for i in range(len(RRintervallist)):
-                                        try:
-                                            RRpeaks = abs(int(RRintervallist[i])*5-int(RRintervallist[i+1])*5)
-                                            SAf.append(RRpeaks)
-                                        except:
-                                            SAf.append(0)
-                                            RRpeaks="0"
-
-
-                                    try:
-                                        Ppeak = waves_peak['ECG_P_Peaks'][5]
-                                        Rpeak = rpeaks[5]
-                                        Ppeak = int(Ppeak)*5
-                                        Rpeak = int(Rpeak)*5
-                                        PRpeaks = abs(Rpeak-Ppeak)
-                                    except:
-                                        PRpeaks = "0"
-                                    try:
-                                        Tpeak = waves_peak['ECG_T_Peaks'][5]
-                                        Qpeak = waves_peak['ECG_Q_Peaks'][5]
-                                        Tpeak = int(Tpeak)*5
-                                        Qpeak = int(Qpeak)*5
-                                        QTpeaks = abs(Tpeak-Qpeak)
-                                    except:
-                                        QTpeaks="0"
-                                        
-                                
-                                    try:
-                                        Speak = waves_peak['ECG_S_Peaks'][5]
-                                        Qpeak = waves_peak['ECG_Q_Peaks'][5]
-                                        Speak = int(Speak)*5
-                                        Qpeak = int(Qpeak)*5
-                                        SQpeaks = abs(Speak-Qpeak)
-                                    except:
-                                        SQpeaks = "0"
-
-                                    try:
-                                        Spa = waves_peak['ECG_S_Peaks'][5]
-                                        Ton = waves_dwt['ECG_T_Onsets'][5]
-                                        Spa = int(Spa)*5
-                                        Ton = int(Ton)*5
-                                        STseg = abs(Ton-Spa)
-                                    except:
-                                        STseg = "0"
-
-                                        
-                                    
-                                    try:
-                                        PP = waves_dwt['ECG_P_Offsets']
-                                        RRO = waves_dwt['ECG_R_Onsets']
-                                        if math.isnan(PP[5]) or math.isnan(RRO[5]):
-                                            PRseg = "0"
-                                        else:
-                                            PPIn = int(PP[5])*5
-                                            RRon = int(RRO[5])*5
-                                            PRseg =  abs(PPIn - RRon)
-                                    
-                                    except:
-                                            PRseg = "0"
-                                            
-                                    try:
-                                        beatss = int(int(HR)/4)
-                                    except:
-                                        beatss = 0
-                                    rrint = rrirrAB(rpeaks)
-                                    finddata=[]
-                                    try:
-                                        result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':positionFinal,"beats":len(rpeaks),"RRInterval":str(SAf[0]),"PRInterval":str(PRpeaks),"QTInterval":str(QTpeaks),"QRSComplex":str(SQpeaks),"STseg":str(STseg),"PRseg":str(PRseg),"noOfPause":0,"noOfPauseList":[],"ecgPackage":allarr,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"offline":True,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
-                                    except:
-                                        result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':positionFinal,"beats":len(rpeaks),"RRInterval":str(0),"PRInterval":str(0),"QTInterval":str(0),"QRSComplex":str(0),"STseg":str(0),"PRseg":str(0),"noOfPause":0,"noOfPauseList":[],"ecgPackage":allarr,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"offline":True,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
-
-                                    noise_cc = noise_check_again(naa)
-                                    if int(HR)<60 and noise_cc == "Normal":
-                                        rpeakss = hamilton_segmenter(signal = naa)["rpeaks"]
-                                        timetakens = round((np.sum(np.diff(datetimee))+500)/1000)
-                                        HRss = int(60*int(len(rpeakss))/(timetakens))
-                                        HRs = int(60*int(len(rpeakss))/(timetaken))
-                                        if HRs>=60 and HRss>=60:
-                                            result_data.update({"Arrhythmia":'Artifacts',"HR":0})
-                                            d2 = result_data
-                                            finddata.append(d2)
-                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                            print("LOG:",newdata)
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-                                        else:
-                                            result_data.update({"Arrhythmia":'Normal',"HR":str(HRs)})
-                                            d1 = result_data
-                                            finddata.append(d1)
-                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                            print("LOG:",newdata)
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-                                        
-                                    elif int(HR)>100 and noise_cc == "Normal":
-                                        result_data.update({"Arrhythmia":'Normal'})
-                                        d2 = result_data
-                                        finddata.append(d2)
-                                        newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                        print("LOG:",newdata)
-                                        client.publish(topic_y,json.dumps(newdata),qos=2)
-                                    elif rrint=="IRREGULAR":
-                                        result_data.update({"Arrhythmia":'ABNORMAL'})
-                                        d1 = result_data
-                                        finddata.append(d1)
-                                        newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                        print("LOG:",newdata)
-                                        client.publish(topic_y,json.dumps(newdata),qos=2)
-
-                                    else:
-                                        if int(HR)<60 and noise_cc != "Normal":
-                                            result_data.update({"Arrhythmia":'Artifacts',"HR":0})
-                                            d2 = result_data
-                                            finddata.append(d2)
-                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                            print("LOG:",newdata)
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-                                        elif int(HR)>100 and noise_cc != "Normal":
-                                            result_data.update({"Arrhythmia":'Artifacts'})
-                                            d2 = result_data
-                                            finddata.append(d2)
-                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                            print("LOG:",newdata)
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-                                        else:
-                                            result_data.update({"Arrhythmia":'Normal'})
-                                            d1 = result_data
-                                            finddata.append(d1)
-                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-                                            print("LOG:",newdata)
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-
-
-                                except Exception as e:
-                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                    print("LOG5:",result_data,e)
-                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-
+                                result_data["Arrhythmia"] = "Artifacts"
+                                result_data['HR']=0
+                                publish_list = [result_data]
+                                print("LOG:",publish_list)
+                                client.publish(topic_y,json.dumps(publish_list),qos=2)
                             else:
+                                
+                                fa=200
+                                naa = np.array(OriginalSignal)
+                                BloodPressure_check = BloodPressure(naa)
+                                # for all lead detection (2, 7, 12)
+                                rpeaks = check_r_index(all_lead_data, fs, int(version))
+                                s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
+                                # rpeaks = detect_beats(naa, float(fa))
+                                beats = []
+                                for nnn in rpeaks:
+                                    beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
                                 try:
-                                    naa = np.array(OriginalSignal)
+                                    br,hrv = BPM(rpeaks)
                                 except:
-                                    naa = np.array(OriginalSignal)
-                                # final_label, percentage, model_data = vfib_model_check_new(naa, vfib_vfl_model, fs=200)
-                                final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
-
-                                if final_label == "VFIB/Vflutter":
-                                        na = np.array(OriginalSignal)
-                                        rpeaks = detect_beats(na, float(100))
-                                        beats = []
-                                        for nnn in rpeaks:
-                                            beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
-
-                                        try:
-                                            br,hrv = BPM(rpeaks)
-                                        except:
-                                            br,hrv = 0,[]
-                                        
-                                        mintime = min(datetimee)
-                                        maxtime = max(datetimee)
-                                        maxtimes = datetime.datetime.fromtimestamp(int(maxtime)/1000)
-                                        maxtimesnewtime =maxtimes.strftime("%Y-%m-%d %H:%M:%S")
-                                        DT2 = parser.parse(maxtimesnewtime)
-                                        mintimes = datetime.datetime.fromtimestamp(int(mintime)/1000)
-                                        mintimesnewtime = mintimes.strftime("%Y-%m-%d %H:%M:%S")
-                                        DT1 = parser.parse(mintimesnewtime)
-                                        timetaken = int((DT2 - DT1).total_seconds())
-                                        try:
-                                            HR = int(60*int(len(rpeaks))/(timetaken))
-                                            if abs(timetaken)<5:
-                                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                print("LOG:",result_data)
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            else:
-                                                result_data = [{"patient":dd["patient"],"HR":int(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'VFIB','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                print("LOG:",result_data)
-                                                for i in result_data:
-                                                    x = mycol.insert_one(dict(i))
-
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
-                                        except:
-                                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
-
-
-                                elif final_label == "ASYS" and int(timetaken)>=5:
-                                    mintime = min(datetimee)
-                                    maxtime = max(datetimee)
-                                    result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'ASYSTOLE','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                    print("LOG:",result_data)
-                                    for i in result_data:
-                                        x = mycol.insert_one(dict(i))
-
-                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                                elif final_label == "Noise":
-                                    print("VFIB Model Noise")
-                                    mintime = min(datetimee)
-                                    maxtime = max(datetimee)
+                                    br,hrv = 0,[]
+                                
+                                HR = int(60*int(len(rpeaks))/(timetaken))
+                                try:
                                     try:
-                                        na = np.array(OriginalSignal)
-                                        rpeaks = detect_beats(na, float(200))
-                                        beats = []
-                                        for nnn in rpeaks:
-                                            beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+                                        _, waves_peak = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="peak")
+                                        signal_dwt, waves_dwt = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="dwt")
+                                    except Exception as rr:
+                                        _, waves_peak = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="peak")
+                                        signal_dwt, waves_dwt = nk.ecg_delineate(naa, rpeaks, sampling_rate=fa, method="cwt")
+                                except Exception as ee:
+                                    print("neurokit2 Error:",ee)
+                                
+                                RRintervallist=[]
+                                for i in rpeaks:
+                                    RRintervallist.append(i)
 
-                                        try:
-                                            br,hrv = BPM(rpeaks)
-                                        except:
-                                            br,hrv = 0,[]
+                                SAf = []
+                                RRpeaks="0"
+                                for i in range(len(RRintervallist)):
+                                    try:
+                                        RRpeaks = abs(int(RRintervallist[i])*5-int(RRintervallist[i+1])*5)
+                                        SAf.append(RRpeaks)
+                                    except:
+                                        SAf.append(0)
+                                        RRpeaks="0"
 
-                                        HR = int(60*int(len(rpeaks))/(timetaken))
-                                        if HR>60 and HR<100:
-                                            # if int(version) == 5:
-                                            #     label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
-                                            #     if label_rlbbb=="LBBB":
-                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            #         print("LOG:",result_data)
-                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            #     elif label_rlbbb=="RBBB":
-                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            #         print("LOG:",result_data)
-                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            #     else:
-                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            #         print("LOG:",result_data)
-                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            # else:
-                                            result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
+                                try:
+                                    Ppeak = waves_peak['ECG_P_Peaks'][5]
+                                    Rpeak = rpeaks[5]
+                                    Ppeak = int(Ppeak)*5
+                                    Rpeak = int(Rpeak)*5
+                                    PRpeaks = abs(Rpeak-Ppeak)
+                                except:
+                                    PRpeaks = "0"
+                                try:
+                                    Tpeak = waves_peak['ECG_T_Peaks'][5]
+                                    Qpeak = waves_peak['ECG_Q_Peaks'][5]
+                                    Tpeak = int(Tpeak)*5
+                                    Qpeak = int(Qpeak)*5
+                                    QTpeaks = abs(Tpeak-Qpeak)
+                                except:
+                                    QTpeaks="0"
+                                        
+                                
+                                try:
+                                    Speak = waves_peak['ECG_S_Peaks'][5]
+                                    Qpeak = waves_peak['ECG_Q_Peaks'][5]
+                                    Speak = int(Speak)*5
+                                    Qpeak = int(Qpeak)*5
+                                    SQpeaks = abs(Speak-Qpeak)
+                                except:
+                                    SQpeaks = "0"
+
+                                try:
+                                    Spa = waves_peak['ECG_S_Peaks'][5]
+                                    Ton = waves_dwt['ECG_T_Onsets'][5]
+                                    Spa = int(Spa)*5
+                                    Ton = int(Ton)*5
+                                    STseg = abs(Ton-Spa)
+                                except:
+                                    STseg = "0"
+
+                                try:
+                                    PP = waves_dwt['ECG_P_Offsets']
+                                    RRO = waves_dwt['ECG_R_Onsets']
+                                    if math.isnan(PP[5]) or math.isnan(RRO[5]):
+                                        PRseg = "0"
+                                    else:
+                                        PPIn = int(PP[5])*5
+                                        RRon = int(RRO[5])*5
+                                        PRseg =  abs(PPIn - RRon)
+                                
+                                except:
+                                    PRseg = "0"
+                                            
+                                try:
+                                    beatss = int(int(HR)/4)
+                                except:
+                                    beatss = 0
+                                rrint = rrirrAB(rpeaks)
+                                finddata=[]
+                                result_data['HR'] = HR
+                                result_data["beats"]=len(rpeaks)
+                                result_data["RRInterval"]=str(SAf[0]) if SAf else str(0)
+                                result_data["PRInterval"]=str(PRpeaks) if PRpeaks else str(0)
+                                result_data["QTInterval"]=str(QTpeaks) if QTpeaks else str(0)
+                                result_data["QRSComplex"]=str(SQpeaks) if SQpeaks else srt(0)
+                                result_data["STseg"]=str(STseg) if STseg else str(0)
+                                result_data["PRseg"]=str(PRseg) if PRseg else str(0)
+                                result_data["templateBeat"]=beats
+                                result_data["threeLatter"]=[]
+                                result_data["nibp"]= BloodPressure_check
+                                
+                                noise_cc = noise_check_again(naa)
+                                if  dd['ecgPackage']=="Free":
+                                    print("Free")
+                                    try:
+                                        if int(HR)<60 and noise_cc == "Normal":
+                                            rpeakss = hamilton_segmenter(signal = naa)["rpeaks"]
+                                            timetakens = round((np.sum(np.diff(datetimee))+500)/1000)
+                                            HRss = int(60*int(len(rpeakss))/(timetakens))
+                                            HRs = int(60*int(len(rpeakss))/(timetaken))
+                                            if HRs>=60 and HRss>=60:
+                                                result_data.update({"Arrhythmia":'Artifacts',"HR":0})
+                                                d2 = result_data
+                                                finddata.append(d2)
+                                                newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                                print("LOG:",newdata)
+                                                client.publish(topic_y,json.dumps(newdata),qos=2)
+                                            else:
+                                                result_data.update({"Arrhythmia":'Normal',"HR":str(HRs)})
+                                                d1 = result_data
+                                                finddata.append(d1)
+                                                newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                                print("LOG:",newdata)
+                                                client.publish(topic_y,json.dumps(newdata),qos=2)
+                                    
+                                        elif int(HR)>100 and noise_cc == "Normal":
+                                            result_data.update({"Arrhythmia":'Normal', "HR":0})
+                                            d2 = result_data
+                                            finddata.append(d2)
+                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                            print("LOG:",newdata)
+                                            client.publish(topic_y,json.dumps(newdata),qos=2)
+                                        elif rrint=="IRREGULAR":
+                                            result_data.update({"Arrhythmia":'ABNORMAL'})
+                                            d1 = result_data
+                                            finddata.append(d1)
+                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                            print("LOG:",newdata)
+                                            client.publish(topic_y,json.dumps(newdata),qos=2)
 
                                         else:
-                                            result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                            print("LOG:",result_data)
-                                            client.publish(topic_y,json.dumps(result_data),qos=2)
-                                    except:
-                                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                        print("LOG:",result_data)
-                                        client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            if int(HR)<60 and noise_cc != "Normal":
+                                                result_data.update({"Arrhythmia":'Artifacts', "HR":0})
+                                                d2 = result_data
+                                                finddata.append(d2)
+                                                newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                                print("LOG:",newdata)
+                                                client.publish(topic_y,json.dumps(newdata),qos=2)
+                                            elif int(HR)>100 and noise_cc != "Normal":
+                                                result_data.update({"Arrhythmia":'Artifacts', "HR":0})
+                                                d2 = result_data
+                                                finddata.append(d2)
+                                                newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                                print("LOG:",newdata)
+                                                client.publish(topic_y,json.dumps(newdata),qos=2)
+                                            else:
+                                                result_data.update({"Arrhythmia":'Normal', "HR":int(HR)})
+                                                d1 = result_data
+                                                finddata.append(d1)
+                                                newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+                                                print("LOG:",newdata)
+                                                client.publish(topic_y,json.dumps(newdata),qos=2)
+                                    except Exception as e:
+                                        result_data["HR"]= 0
+                                        result_data["Arrhythmia"]='Artifacts'
+                                        result_data["beats"]=0
+                                        result_data["RRInterval"]=0
+                                        result_data["PRInterval"]=0
+                                        result_data["QTInterval"]=0
+                                        result_data["QRSComplex"]=0
+                                        result_data["STseg"]=0
+                                        result_data["PRseg"]=0
+                                        result_data["Vbeats"]=0
+                                        result_data["noOfPause"]=0
+                                        result_data["ISOLATEDCOUNT"]=0
+                                        result_data["COUPLETCOUNT"]=0
+                                        result_data["TRIPLETCOUNT"]=0
+                                        result_data["PACTRIPLETCOUNT"]=0
+                                        result_data["PACCOUPLETCOUNT"]=0
+                                        result_data["ISOPAC"]=0
+                                        result_data["PACTOTALCOUNT"]=0
+                                        result_data["HRV"]=[]
+                                        result_data["RR"]= 0
+                                        publish_list = [result_data]
+                                        print("LOG5:",publish_list,e)
+                                        client.publish(topic_y,json.dumps(publish_list),qos=2)
 
                                 else:
-                                    try:
-                                        aboutdata = pd.DataFrame({"ECG":OriginalSignal})
-                                        with warnings.catch_warnings():
-                                            warnings.filterwarnings("ignore", category=RuntimeWarning)
-                                        for i in glob.glob(imageresource+"/*.jpg"):
-                                            os.remove(i)
+                                    final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
+                                    BloodPressure_check = BloodPressure(naa)
 
-
-                                        newdada = aboutdata["ECG"]
-                                        naa = np.array(newdada)
-
-                                        # 2, 7, 12 lead according r peak detection
-                                        rpeaks = check_r_index(all_lead_data, fs, int(version))
-                                        s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
-                                        rrint=''
-                                        fa=200
-                                        # rpeaks = detect_beats(newdada, float(fa))
-                                        beats = []
-                                        for nnn in rpeaks:
-                                            beats.append({"index":int(nnn),"dateTime":int(date_time[nnn])})
+                                    if "VFIB/Vflutter" in final_label:
                                         try:
-                                            br,hrv = BPM(rpeaks)
+                                            if abs(timetaken)<5:
+                                                result_data["HR"]= 0
+                                                result_data["Arrhythmia"]= 'Artifacts'
+                                                result_data["HRV"] = []
+                                                result_data["RR"] = 0
+                                                result_data["nibp"]={}
+                                                publish_list = [result_data]
+                                                print("LOG:",publish_list)
+                                                client.publish(topic_y,json.dumps(publish_list),qos=2)
+                                            else:
+                                                result_data["Arrhythmia"]='VFIB'
+                                                result_data["HR"]= int(HR)
+                                                result_data["HRV"]:hrv
+                                                result_data["RR"]:br
+                                                result_data["templateBeat"]:beats
+                                                result_data["nibp"]:BloodPressure_check
+                                                publish_list = [result_data]
+                                                print("LOG:",publish_list)
+                                                for i in publish_list:
+                                                    x = mycol.insert_one(dict(i))
+                                                client.publish(topic_y,json.dumps(publish_list),qos=2)
                                         except:
-                                            br,hrv = 0,[]
-                                        r_index = rpeaks
-
-
-                                        b_es = baseline_construction_200(newdada,101)
-                                        low_es = lowpass(b_es)
-                                        r = list(r_index)
-                                        r_index = np.array(r)
-                                        # s_index = find_s_indexs(b_es,r_index,20)
-                                        # q_index = find_q_indexs(b_es, r_index, 15)
-                                        j_index = find_j_indexs(b_es,s_index)
-                                        wideqrs=[]
-                                        for iii in range(len(q_index)-1):
-                                            if np.isnan(q_index[iii]):
-                                                q_index[iii]=0
-                                                wideqrs.append(0)
-                                            elif np.isnan(s_index[iii]):
-                                                s_index[iii]=0
-                                                wideqrs.append(0)
+                                            result_data["HR"]= 0
+                                            result_data["Arrhythmia"]= 'Artifacts'
+                                            result_data["HRV"] = []
+                                            result_data["RR"] = 0
+                                            result_data["nibp"]={}
+                                            publish_list = [result_data]                                                  
+                                            print("LOG6:",publish_list)
+                                            client.publish(topic_y,json.dumps(publish_list),qos=2)
+                                    elif "ASYS" in final_label  and int(timetaken)>=5:
+                                        result_data["Arrhythmia"] = 'ASYSTOLE'
+                                        result_data["HR"] = 0
+                                        result_data["HRV"]:[]
+                                        result_data["RR"]:0
+                                        publish_list = [result_data]
+                                        print("LOG:",publish_list)
+                                        for i in publish_list:
+                                            x = mycol.insert_one(dict(i))
+                                        client.publish(topic_y,json.dumps(publish_list),qos=2)
+                                    elif "Noise" in final_label:
+                                        result_data["beats"]=0
+                                        result_data["RRInterval"]=0
+                                        result_data["PRInterval"]=0
+                                        result_data["QTInterval"]=0
+                                        result_data["QRSComplex"]=0
+                                        result_data["STseg"]=0
+                                        result_data["PRseg"]=0
+                                        result_data["Vbeats"]=0
+                                        result_data["noOfPause"]=0
+                                        result_data["ISOLATEDCOUNT"]=0
+                                        result_data["COUPLETCOUNT"]=0
+                                        result_data["TRIPLETCOUNT"]=0
+                                        result_data["PACTRIPLETCOUNT"]=0
+                                        result_data["PACCOUPLETCOUNT"]=0
+                                        result_data["ISOPAC"]=0
+                                        result_data["PACTOTALCOUNT"]=0
+                                        try:
+                                            if HR>60 and HR<100:
+                                                result_data["HR"] = int(HR)
+                                                result_data["Arrhythmia"] ='Normal'
+                                                result_data["templateBeat"]= beats
                                                 
+                                                publish_list = [result_data] 
+                                                print("LOG:",publish_list)
+                                                client.publish(topic_y,json.dumps(publish_list),qos=2)
                                             else:
-                                                difff = s_index[iii]-q_index[iii]
-                                                wideqrs.append((difff*5)/1000)
-                                        
-                                        newpvcs = []
-                                        newpvcswide = []
-                                        
-                                        for ias in wideqrs:
-                                            if ias>=0.09:
-                                                newpvcs.append(1)
-                                            else:
-                                                newpvcs.append(0)
-                                        
-                                        for iass in wideqrs:
-                                            if iass>=0.13:
-                                                newpvcswide.append(1)
-                                            else:
-                                                newpvcswide.append(0)
-
-                                        print(newpvcs)
-                                        ss2 = low_es
-                                        pt1 = []
-                                        p_t1 = []
-                                        pt, p_t = find_p_t(low_es, r_index, q_index, s_index)
-                                        try:
-                                            try:
-                                                _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
-                                                signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="dwt")
-                                            except Exception as rr:
-                                                _, waves_peak = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="peak")
-                                                signal_dwt, waves_dwt = nk.ecg_delineate(newdada, rpeaks, sampling_rate=fa, method="cwt")
-                                        except Exception as ee:
-                                            print("neurokit2 Error:",ee)
-                                        rrint = rrirrAB(rpeaks)
-                                        RRintervallist = []
-                                        for i in rpeaks:
-                                            RRintervallist.append(i)
-                                        SAf = []
-                                        
-                                        for i in range(len(RRintervallist)):
-                                            try:
-                                                RRpeaks = abs(int(RRintervallist[i])*5-int(RRintervallist[i+1])*5)
-                                                SAf.append(RRpeaks)
-                                            except:
-                                                SAf.append(0)
-                                                RRpeaks="0"
-                                        print(SAf)
-
-
-                                        try:
-                                            Ppeak = waves_peak['ECG_P_Peaks'][5]
-                                            Rpeak = rpeaks[5]
-                                            Ppeak = int(Ppeak)*5
-                                            Rpeak = int(Rpeak)*5
-                                            PRpeaks = abs(Rpeak-Ppeak)
+                                                result_data["HR"] = 0
+                                                result_data["Arrhythmia"] = "Artifacts"
+                                                result_data["HRV"]= []
+                                                result_data["RR"]=0
+                                                result_data["nibp"]={}
+                                                publish_list = [result_data] 
+                                                print("LOG:",publish_list)
+                                                client.publish(topic_y,json.dumps(publish_list),qos=2)
                                         except:
-                                            PRpeaks = "0"
-                                        try:
-                                            Tpeak = waves_peak['ECG_T_Peaks'][5]
-                                            Qpeak = waves_peak['ECG_Q_Peaks'][5]
-                                            Tpeak = int(Tpeak)*5
-                                            Qpeak = int(Qpeak)*5
-                                            QTpeaks = abs(Tpeak-Qpeak)
-                                        except:
-                                            QTpeaks="0"
-                                            
-                                    
-                                        try:
-                                            Speak = waves_peak['ECG_S_Peaks'][5]
-                                            Qpeak = waves_peak['ECG_Q_Peaks'][5]
-                                            Speak = int(Speak)*5
-                                            Qpeak = int(Qpeak)*5
-                                            SQpeaks = abs(Speak-Qpeak)
-                                        except:
-                                            SQpeaks = "0"
+                                            result_data["HR"]=0
+                                            result_data["Arrhythmia"]='Artifacts' 
+                                            result_data["HRV"]=[],
+                                            result_data["RR"]=0,
+                                            publish_list = [result_data]
+                                            print("LOG7:",publish_list)
+                                            client.publish(topic_y,json.dumps(publish_list),qos=2)
 
+                                    else:
                                         try:
-                                            Spa = waves_peak['ECG_S_Peaks'][5]
-                                            Ton = waves_dwt['ECG_T_Onsets'][5]
-                                            Spa = int(Spa)*5
-                                            Ton = int(Ton)*5
-                                            STseg = abs(Ton-Spa)
-                                        except:
-                                            STseg = "0"
+                                            aboutdata = pd.DataFrame({"ECG":OriginalSignal})
+                                            with warnings.catch_warnings():
+                                                warnings.filterwarnings("ignore", category=RuntimeWarning)
+                                            for i in glob.glob(imageresource+"/*.jpg"):
+                                                os.remove(i)
 
-                                            
+                                            newdada = aboutdata["ECG"]
+                                            naa = np.array(newdada)
+                                            rrint=''
+                                            fa=200
                                         
-                                        try:
-                                            PP = waves_dwt['ECG_P_Offsets']
-                                            RRO = waves_dwt['ECG_R_Onsets']
-                                            if math.isnan(PP[5]) or math.isnan(RRO[5]):
-                                                PRseg = "0"
-                                            else:
-                                                PPIn = int(PP[5])*5
-                                                RRon = int(RRO[5])*5
-                                                PRseg =  abs(PPIn - RRon)
-                                        
-                                        except:
-                                            PRseg = "0"
-
-                                        pvc = ''
-                                        afib = ''
-                                        var=''
-                                        brad = ''
-                                        tachy = ''
-                                        VT=''
-                                        mintime = min(datetimee)
-                                        maxtime = max(datetimee)
-                                        maxtimes = datetime.datetime.fromtimestamp(int(maxtime)/1000)
-                                        maxtimesnewtime =maxtimes.strftime("%Y-%m-%d %H:%M:%S")
-                                        DT2 = parser.parse(maxtimesnewtime)
-                                        mintimes = datetime.datetime.fromtimestamp(int(mintime)/1000)
-                                        mintimesnewtime = mintimes.strftime("%Y-%m-%d %H:%M:%S")
-                                        DT1 = parser.parse(mintimesnewtime)
-                                        timetaken = int((DT2 - DT1).total_seconds())
-                                        finddata = []
-
-                                        HR = int(60*int(len(rpeaks))/(timetaken))
-                                        print("HRRRR:",HR)
-                                        OrHR = HR
-                                        try:
-                                            result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':positionFinal,"beats":len(rpeaks),"RRInterval":str(SAf[0]),"PRInterval":str(PRpeaks),"QTInterval":str(QTpeaks),"QRSComplex":str(SQpeaks),"STseg":str(STseg),"PRseg":str(PRseg),"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"noOfPauseList":[],"ecgPackage":"All-Arrhythmia","trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"threeLatter":[],"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
-                                        except Exception as e:
-                                            print(e)
-                                            result_data = {"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'','kit':dd["kit"],'position':0,"beats":len(rpeaks),"RRInterval":str(0),"PRInterval":str(0),"QTInterval":str(0),"QRSComplex":str(0),"STseg":str(0),"PRseg":str(0),"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"noOfPauseList":[],"ecgPackage":"All-Arrhythmia","trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"threeLatter":[],"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}
-
-                                        naaaaa = np.array(newdada)
-                                        r_index_s = find_r_peakss(naaaaa,fs=200)
-                                        rrints = rrirrAB(r_index_s)
-                                        if int(timetaken)>6:
-                                            try:
-                                                newafib,ei_ti = afib_fultter_model_check(naaaaa, afib_load_model, 200,newsublist)
-                                                rpeaks = detect_beats(naaaaa,200)
-                                                HR = int(60*int(len(rpeaks))/(timetaken))
-                                                if HR<40:
-                                                    pass
+                                            r_index = rpeaks
+                                            b_es = baseline_construction_200(newdada,101)
+                                            low_es = lowpass(b_es)
+                                            r = list(r_index)
+                                            r_index = np.array(r)
+                                            j_index = find_j_indexs(b_es,s_index)
+                                            wideqrs=[]
+                                            for iii in range(len(q_index)-1):
+                                                if np.isnan(q_index[iii]):
+                                                    q_index[iii]=0
+                                                    wideqrs.append(0)
+                                                elif np.isnan(s_index[iii]):
+                                                    s_index[iii]=0
+                                                    wideqrs.append(0)
+                                                    
                                                 else:
-                                                    if newafib == "Aflutter": # and int(HR)>=62
-                                                        result_data.update({"Arrhythmia":'AFL',"PRInterval":"0","HR":str(HR)})
-                                                        last_label_afl = ''
-                                                        for ei_ti_afib_afl in ei_ti:
-                                                            if last_label_afl!="Aflutter":
-                                                              last_label_afl = "Aflutter"
-                                                              result_data["threeLatter"].append(ei_ti_afib_afl)
-                                                        d4 = result_data
-                                                        finddata.append(d4)
-                                                    if rrints == "IRREGULAR" and rrint=="IRREGULAR":
-                                                        if newafib == "Afib":
-                                                            result_data.update({"Arrhythmia":'AFIB',"PRInterval":"0","HR":str(HR)})
-                                                            last_label = ''
+                                                    difff = s_index[iii]-q_index[iii]
+                                                    wideqrs.append((difff*5)/1000)
+                                            
+                                            newpvcs = []
+                                            newpvcswide = []
+                                            
+                                            for ias in wideqrs:
+                                                if ias>=0.09:
+                                                    newpvcs.append(1)
+                                                else:
+                                                    newpvcs.append(0)
+                                            
+                                            for iass in wideqrs:
+                                                if iass>=0.12:
+                                                    newpvcswide.append(1)
+                                                else:
+                                                    newpvcswide.append(0)
+
+                                            print(newpvcs)
+                                            pt, p_t = find_p_t(low_es, r_index, q_index, s_index)
+
+                                            finddata = []
+                                            result_data["ecgPackage"]="All-Arrhythmia"
+                                            result_data['HR']=HR
+                                            
+                                            r_index_s = find_r_peakss(naa,fs=200)
+                                            rrints = rrirrAB(r_index_s)
+                                            if int(timetaken)>6:
+                                                try:
+                                                    newafib,ei_ti = afib_fultter_model_check(naa, afib_load_model, 200,newsublist)
+                                                    # rpeaks = detect_beats(naa,200)
+                                                    # HR = int(60*int(len(rpeaks))/(timetaken))
+                                                    if HR<40:
+                                                        pass
+                                                    else:
+                                                        if newafib == "Aflutter": # and int(HR)>=62
+                                                            result_data.update({"Arrhythmia":'AFL',"PRInterval":"0","HR":str(HR)})
+                                                            last_label_afl = ''
                                                             for ei_ti_afib_afl in ei_ti:
-                                                                if last_label!='afib':
-                                                                    last_label="afib"
+                                                                if last_label_afl!="Aflutter":
+                                                                    last_label_afl = "Aflutter"
                                                                     result_data["threeLatter"].append(ei_ti_afib_afl)
                                                             d4 = result_data
                                                             finddata.append(d4)
-                                                        if newafib == "Abnormal":
-                                                            result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":str(HR)})
-                                                            d4 = result_data
-                                                            finddata.append(d4)
-                                            except Exception as e:
-                                                print("AFIB_AFL issue",e)
-                            
-                                        if float(HR)<60 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and result_data["Arrhythmia"]!="ABNORMAL":
-                                            if(SACompare(SAf, 5000)) and (rrints == "IRREGULAR" or rrints == "REGULAR"):
-                                                result_data.update({"Arrhythmia":'Long Pause'})
+                                                        if rrints == "IRREGULAR" and rrint=="IRREGULAR":
+                                                            if newafib == "Afib":
+                                                                result_data.update({"Arrhythmia":'AFIB',"PRInterval":"0","HR":str(HR)})
+                                                                last_label = ''
+                                                                for ei_ti_afib_afl in ei_ti:
+                                                                    if last_label!='afib':
+                                                                        last_label="afib"
+                                                                        result_data["threeLatter"].append(ei_ti_afib_afl)
+                                                                d4 = result_data
+                                                                finddata.append(d4)
+                                                            if newafib == "Abnormal":
+                                                                result_data.update({"Arrhythmia":'SINUS-ARR',"PRInterval":"0","HR":str(HR)})
+                                                                d4 = result_data
+                                                                finddata.append(d4)
+                                                except Exception as e:
+                                                    print("AFIB_AFL issue",e)
+                                
+                                            if float(HR)<60 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and result_data["Arrhythmia"]!="ABNORMAL":
+                                                if(SACompare(SAf, 5000)) and (rrints == "IRREGULAR" or rrints == "REGULAR"):
+                                                    result_data.update({"Arrhythmia":'Long Pause', "HR": int(HR)})
+                                                    d1 = result_data
+                                                    finddata.append(d1)
+                                                else:
+                                                    rpeaksss = hamilton_segmenter(signal = low_es)["rpeaks"]
+                                                    timetakens = round((np.sum(np.diff(datetimee))+500)/1000)
+                                                    HRs = int(60*int(len(rpeaksss))/(timetaken))
+                                                    HRss = int(60*int(len(rpeaksss))/(timetakens))
+                                                    if HRs>=60 and HRss>=60:
+                                                        pass
+                                                    elif rrints == "IRREGULAR" and rrint=="IRREGULAR":
+                                                        result_data.update({"Arrhythmia":'SINUS-ARR',"HR":int(HRs)})
+                                                        d1 = result_data
+                                                        finddata.append(d1)
+                                                    else:
+                                                        result_data.update({"Arrhythmia":'BR',"HR":int(HRs)})
+                                                        d1 = result_data
+                                                        finddata.append(d1)
+                                            
+                                            if float(HR)>100 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and rrints != "IRREGULAR" and rrint != "IRREGULAR":
+                                                result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
+                                                d2 = result_data
+                                                finddata.append(d2)
+
+                                            if (SACompare(SAf, 5000)):
+                                                l=[]
+                                                for x in SAf:
+                                                    if x>=5000:
+                                                        l.append(1)
+                                                    else:
+                                                        l.append(0)
+                                                if 1 in l:
+                                                    noofpause = l.count(1)
+                                                else:
+                                                    noofpause = 0
+                                                
+                                                
+                                                # if result_data["Arrhythmia"]=="AFIB":  
+                                                #     result_data.update({"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>3000]})
+                                                #     d1 = result_data
+                                                #     finddata.append(d1)
+                                                # else:
+                                                result_data.update({"Arrhythmia":'Long Pause', "HR": int(HR),"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>3000]})
                                                 d1 = result_data
                                                 finddata.append(d1)
-                                            else:
-                                                # rpeaksss = QRS_detection(newdada,200,350)
-                                                rpeaksss = hamilton_segmenter(signal = low_es)["rpeaks"]
-                                                timetakens = round((np.sum(np.diff(datetimee))+500)/1000)
-                                                HRs = int(60*int(len(rpeaksss))/(timetaken))
-                                                HRss = int(60*int(len(rpeaksss))/(timetakens))
-                                                if HRs>=60 and HRss>=60:
-                                                    pass
-                                                elif rrints == "IRREGULAR" and rrint=="IRREGULAR":
-                                                    result_data.update({"Arrhythmia":'SINUS-ARR',"HR":str(HRs)})
-                                                    d1 = result_data
-                                                    finddata.append(d1)
-                                                else:
-                                                    result_data.update({"Arrhythmia":'BR',"HR":str(HRs)})
-                                                    d1 = result_data
-                                                    finddata.append(d1)
-                                        
-                                        if float(HR)>100 and result_data["Arrhythmia"]!="AFIB" and result_data["Arrhythmia"]!="AFL" and rrints != "IRREGULAR" and rrint != "IRREGULAR":
-                                            result_data.update({"Arrhythmia":'TC'})
-                                            d2 = result_data
-                                            finddata.append(d2)
-
-                                        if (SACompare(SAf, 3000)):
-                                            l=[]
-                                            for x in SAf:
-                                                if x>=3000:
-                                                    l.append(1)
-                                                else:
-                                                    l.append(0)
-                                            if 1 in l:
-                                                noofpause = l.count(1)
-                                            else:
-                                                noofpause = 0
-                                            
-                                            
-                                            if result_data["Arrhythmia"]=="AFIB":  
-                                              result_data.update({"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>3000]})
-                                              d1 = result_data
-                                              finddata.append(d1)
-                                            else:
-                                              result_data.update({"Arrhythmia":'Long Pause',"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>3000]})
-                                              d1 = result_data
-                                              finddata.append(d1)
 
 
-                                        if SACompareShort(SAf,2000,2900):
-                                            l=[]
-                                            for x in SAf:
-                                                if x>=2000 and x<=2900:
-                                                    l.append(1)
-                                                else:
-                                                    l.append(0)
-                                            if 1 in l:
-                                                noofpause = l.count(1)
-                                            else:
-                                                noofpause = 0
-                                                
-                                            if result_data["Arrhythmia"]=="AFIB":
-                                              result_data.update({"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
-                                              d1 = result_data
-                                              finddata.append(d1)
-                                            else:
-                                              result_data.update({"Arrhythmia":'Short Pause',"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
-                                              d1 = result_data
-                                              finddata.append(d1)
-
-                                        patientid = dd["patient"]
-                                        layer2 = newpvcs
-                                        if 1 in layer2:
-                                            if os.path.exists("pvcs/"+patientid):
-                                                pass
-                                            else:
-                                                os.mkdir("pvcs/"+patientid)
-                                            pvc_r_index = check_r_index(all_lead_data, fs, int(version))
-                                            pvc_detection_result = PVCDetection(all_lead_data, fs, pvc_r_index, date_time, patientid, is_lead=int(version)).get_pvc_data()
-                                            peaksdefined, observer= [], []
-                                            pvc_label = ""
-                                            pvc_counts = {}
-                                            if 'newdatepvclist' in pvc_detection_result:
-                                                peaksdefined = pvc_detection_result['newdatepvclist']
-                                            if 'observer' in pvc_detection_result:
-                                                observer = pvc_detection_result['observer']
-                                            if 'pvc_label' in pvc_detection_result:
-                                                pvc_label = pvc_detection_result['pvc_label']
-                                            if 'pvc_counts' in pvc_detection_result:
-                                                pvc_counts = pvc_detection_result['pvc_counts']
-                                            
-                                            # finaliso = actaulPVC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - c_count*2 - t_count*3
-                                            if pvc_label:
-                                                
-                                                if 'PVC-Isolated' in pvc_label: #actaulPVC.count(1)>0:
-                                                    result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":observer.count(1),"HR":int(HR),"ISOLATEDCOUNT":observer.count(1),"peakslocation":peaksdefined})
-                                                    
-                                                if 'PVC-Quadrigeminy'in pvc_label: #Quadgem_count>=1:
-                                                    result_data.update({"Arrhythmia":'PVC-Quadrigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                if "PVC-Trigeminy" in pvc_label: #Trigem_count>=1:
-                                                    result_data.update({"Arrhythmia":'PVC-Trigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                if "PVC-Bigeminy" in pvc_label: #bigem_count>=1:
-                                                    result_data.update({"Arrhythmia":'PVC-Bigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                if "PVC-Couplet" in pvc_label: #c_count>=1:
-                                                    result_data.update({"Arrhythmia":'PVC-Couplet',"Vbeats":observer.count(1),"HR":int(HR),"COUPLETCOUNT":pvc_counts['PVC-Couplet_counter'],"peakslocation":peaksdefined}) # c_count
-                                                if "PVC-Triplet" in pvc_label: # t_count>=1:
-                                                    result_data.update({"Arrhythmia":'PVC-Triplet',"Vbeats":observer.count(1),"HR":int(HR),"TRIPLETCOUNT":pvc_counts['PVC-Triplet_counter'],"peakslocation":peaksdefined}) # t_count
-                                                if float(HR)>100.0:
-                                                    if "PVC-VT" in pvc_label and observer.count(1)>12:  #vt_count>=1 and bb.count(1)>12:
-                                                        result_data.update({"Arrhythmia":'VT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                    if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
-                                                        result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-
-                                            #    if float(HR)>60.0 and float(HR)<=100.0:
-                                            #        if "PVC-Aivr" in pvc_label: # aivr_count>=1:
-                                            #            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-                                                
-                                                if float(HR)<=100.0:
-                                                    if "PVC-Ivr" in pvc_label: #ivr_count>=1:
-                                                        result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
-
-                                            elif lbbb_rbbb_label and int(version) in [5, 8] and 1 in newpvcswide and int(HR)<100:
-                                                if lbbb_rbbb_label == "LBBB":
-                                                    result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                                elif lbbb_rbbb_label == "RBBB":
-                                                    result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                            else:
-                                                wideq = wide_qrs_detection(low_es, fs=200)
-                                                if wideq["wideqrs_label"]=="Wide_QRS" and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
-                                                    widelens = len(wideq["wideqrs_index"])
-                                                    if widelens>5 and (1 in newpvcswide):
-                                                        result_data.update({"Arrhythmia":'WIDE-QRS',"Count":widelens,"peakslocation":peaksdefined})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-
-                                            d3 = result_data
-                                            finddata.append(d3)
-
-                                        if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"] and int(timetaken)>6:
-                                            pac_r_index = check_r_index(all_lead_data, fs, int(version))
-                                
-                                            pac_detection_result = PACDetection(all_lead_data, pac_r_index, fs, is_lead=int(version)).get_pac_data()
-                                            actaulPAC = []
-                                            pac_label, jr_label = '', ''
-                                            forPAC = 0
-                                            if 'updated_union' in pac_detection_result:
-                                                actaulPAC = pac_detection_result['updated_union']
-                                            if 'pac_label' in pac_detection_result:
-                                                pac_label = pac_detection_result['pac_label']
-                                            if 'pac_counts' in pac_detection_result:
-                                                pac_counts = pac_detection_result['pac_counts']
-                                            if 'variations' in pac_detection_result:
-                                                forPAC = Average(pac_detection_result['variations'])
-                                            if 'jnc_label' in pac_detection_result:
-                                                jr_label = pac_detection_result['jnc_label']
-                                            # finaliso = actaulPAC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - pac_c_count*2 - pac_t_count*3
-                                            if pac_label:
-                                                if 'PAC-Isolated' in pac_label and forPAC>6: # actaulPAC.count(1)>0
-                                                    result_data.update({"Arrhythmia":'PAC-Isolated',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"ISOPAC":abs(pac_counts['PAC-Isolated_counter'])})
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                                if  'PAC-Quadrigem' in pac_label and forPAC>6: # Quadgem_count>=1
-                                                    result_data.update({"Arrhythmia":'PAC-Quadrigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACQUADRIGEMCOUNT":pac_counts['PAC-Quadrigem_counter']}) # Quadgem_count
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-
-                                                if 'PAC-Trigem' in pac_label and forPAC>6: # Trigem_count>=1
-                                                    result_data.update({"Arrhythmia":'PAC-Trigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIGEMCOUNT":pac_counts['PAC-Trigem_counter']}) # Trigem_count
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-
-                                                if 'PAC-Bigem' in pac_label and forPAC>6: # bigem_count>=1
-                                                    result_data.update({"Arrhythmia":'PAC-Bigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACBIGEMCOUNT":pac_counts['PAC-Bigem_counter']}) # bigem_count
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-
-                                                if 'PAC-Couplet' in pac_label and forPAC>6: # pac_c_count>=1
-                                                    result_data.update({"Arrhythmia":'PAC-Couplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACCOUPLETCOUNT":pac_counts['PAC-Couplet_counte']}) # pac_c_count
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-
-                                                if 'PAC-Triplet' in pac_label and forPAC>6: # pac_t_count>=1
-                                                    result_data.update({"Arrhythmia":'PAC-Triplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIPLETCOUNT":pac_counts['PAC-Triplet_counter']}) # pac_t_count
-                                                    d3 = result_data 
-                                                    finddata.append(d3)
-
-                                                if float(HR)>=150.0:
-                                                    if 'SVT' in pac_label: # at_count>=1
-                                                        result_data.update({"Arrhythmia":'SVT',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR)})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-
-                                        tf.keras.backend.clear_session()
-                                        if int(HR)<=80 and int(timetaken)>6 and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
-                                            try:
-                                                jnrhy = jr_label
-                                                if jnrhy=="Junctional_Rhythm":
-                                                    result_data.update({"Arrhythmia":'JN-RHY'})
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                                elif jnrhy=="Junctional_Bradycardia":                                
-                                                    result_data.update({"Arrhythmia":'JN-BR'})
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                            except:
-                                                print("JN ISSUE")
-
-                                        if result_data['Arrhythmia']=='' and rrint == "REGULAR":
-                                            result_data.update({"Arrhythmia":'Normal'})
-                                            d3 = result_data
-                                            finddata.append(d3)
-                                            
-                                        if (result_data['Arrhythmia']=='BR' or result_data['Arrhythmia']=='Short Pause' or result_data['Arrhythmia']=='Normal' or result_data['Arrhythmia']=='') and int(HR)<80 and int(timetaken)>=7:
-                                            try:
-                                                block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
-                                                final_label = block_results['block_label']
-                                                ei_ti_block = block_results['ei_ti_label']
-                                                if final_label == "III Degree": 
-                                                    result_data.update({"Arrhythmia":'III Degree'})
-                                                    for ei_ti_blockdata in ei_ti_block:
-                                                        result_data["threeLatter"].append(ei_ti_blockdata)
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                                elif final_label == "MOBITZ-I":
-                                                    result_data.update({"Arrhythmia":'MOBITZ-I'})
-                                                    for ei_ti_blockdata in ei_ti_block:
-                                                        result_data["threeLatter"].append(ei_ti_blockdata)
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-                                                elif final_label == "MOBITZ-II":
-                                                    result_data.update({"Arrhythmia":'MOBITZ-II'})
-                                                    for ei_ti_blockdata in ei_ti_block:
-                                                        result_data["threeLatter"].append(ei_ti_blockdata)
-                                                    
-                                                    d3 = result_data
-                                                    finddata.append(d3)
-
-                                                else:
-                                                    if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","WIDE-QRS","SVT",'PAC-Triplet','PAC-Couplet','PAC-Bigeminy','PAC-Trigeminy','PAC-Quadrigeminy','PAC-Isolated','ABNORMAL','Long Pause','Short Pause'] and rrint == "IRREGULAR":
-                                                        result_data.update({"Arrhythmia":'SINUS-ARR'})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-                                            except Exception as e:
-                                                print("MOBITZ-I,MOBITZ-II,III Degree issue",e)
-                                                
-                                        if result_data['Arrhythmia']=='' and rrint == "IRREGULAR":
-                                            result_data.update({"Arrhythmia":'SINUS-ARR'})
-                                            d3 = result_data
-                                            finddata.append(d3)
-
-                                        if (result_data['Arrhythmia']=='Normal' or rrint=="REGULAR") and int(HR)<100 and int(timetaken)>7:
-                                            try:
-                                                b, a = signal.butter(3, 0.3, btype='lowpass', analog=False)
-                                                low_passed = signal.filtfilt(b, a, newdada)
-                                                rpeaksnew = detect_beats(low_passed, float(fa))
-                                                _, waves_peak = nk.ecg_delineate(low_passed, unique(rpeaksnew), sampling_rate=fa, method="peak")
-                                                signal_dwt, waves_dwt = nk.ecg_delineate(low_passed, unique(rpeaksnew), sampling_rate=fa, method="dwt")
-                                                firststblock =[]
-                                                rpeaks1 = unique(rpeaksnew)
-                                                Ppeaks = unique(waves_peak['ECG_P_Peaks'])
-                                                
-                                                #dwt method
-                                                for iii in range(len(Ppeaks)):
-                                                    if np.isnan(Ppeaks[iii]):
-                                                        Ppeaks[iii]=0
-                                                        firststblock.append(0)
+                                            if SACompareShort(SAf,2000,2900):
+                                                l=[]
+                                                for x in SAf:
+                                                    if x>=2000 and x<=2900:
+                                                        l.append(1)
                                                     else:
-                                                        difff = rpeaksnew[iii]-Ppeaks[iii]
-                                                        firststblock.append((difff*5)/1000)
-                                                firstblockfinal=[]
-                                                for findtime in firststblock:
-                                                    if findtime>0.26:
-                                                        firstblockfinal.append(findtime)
+                                                        l.append(0)
+                                                if 1 in l:
+                                                    noofpause = l.count(1)
+                                                else:
+                                                    noofpause = 0
+                                                    
+                                                # if result_data["Arrhythmia"]=="AFIB":
+                                                #     result_data.update({"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
+                                                #     d1 = result_data
+                                                #     finddata.append(d1)
+                                                # else:
+                                                result_data.update({"Arrhythmia":'Short Pause', "HR": int(HR),"noOfPause":noofpause,"noOfPauseList":[a/1000 for a in SAf if a>=2000 and a<=2900 ]})
+                                                d1 = result_data
+                                                finddata.append(d1)
 
-                                                if len(firstblockfinal)>5:
-                                                    result_data.update({"Arrhythmia":'I DEGREE',"PRInterval":firstblockfinal[0]})
+                                            patientid = dd["patient"]
+                                            layer2 = newpvcs
+                                            if 1 in layer2:
+                                                if os.path.exists("pvcs/"+patientid):
+                                                    pass
+                                                else:
+                                                    os.mkdir("pvcs/"+patientid)
+                                                # pvc_r_index = check_r_index(all_lead_data, fs, int(version))
+                                                pvc_detection_result = PVCDetection(all_lead_data, fs, rpeaks, date_time, patientid, is_lead=int(version)).get_pvc_data()
+                                                peaksdefined, observer= [], []
+                                                pvc_label = ""
+                                                lbbb_rbbb_label = ""
+                                                pvc_counts = {}
+                                                if 'newdatepvclist' in pvc_detection_result:
+                                                    peaksdefined = pvc_detection_result['newdatepvclist']
+                                                if 'observer' in pvc_detection_result:
+                                                    observer = pvc_detection_result['observer']
+                                                if 'pvc_label' in pvc_detection_result:
+                                                    pvc_label = pvc_detection_result['pvc_label']
+                                                if 'pvc_counts' in pvc_detection_result:
+                                                    pvc_counts = pvc_detection_result['pvc_counts']
+                                                if 'lbbb_rbbb_label' in pvc_detection_result:
+                                                    lbbb_rbbb_label = pvc_detection_result['lbbb_rbbb_label']
+                                                
+                                                # finaliso = actaulPVC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - c_count*2 - t_count*3
+                                                if pvc_label:
+                                                    
+                                                    if 'PVC-Isolated' in pvc_label: #actaulPVC.count(1)>0:
+                                                        result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":observer.count(1),"HR":int(HR),"ISOLATEDCOUNT":observer.count(1),"peakslocation":peaksdefined})
+                                                        
+                                                    if 'PVC-Quadrigeminy'in pvc_label: #Quadgem_count>=1:
+                                                        result_data.update({"Arrhythmia":'PVC-Quadrigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                    if "PVC-Trigeminy" in pvc_label: #Trigem_count>=1:
+                                                        result_data.update({"Arrhythmia":'PVC-Trigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                    if "PVC-Bigeminy" in pvc_label: #bigem_count>=1:
+                                                        result_data.update({"Arrhythmia":'PVC-Bigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                    if "PVC-Couplet" in pvc_label: #c_count>=1:
+                                                        result_data.update({"Arrhythmia":'PVC-Couplet',"Vbeats":observer.count(1),"HR":int(HR),"COUPLETCOUNT":pvc_counts['PVC-Couplet_counter'],"peakslocation":peaksdefined}) # c_count
+                                                    if "PVC-Triplet" in pvc_label: # t_count>=1:
+                                                        result_data.update({"Arrhythmia":'PVC-Triplet',"Vbeats":observer.count(1),"HR":int(HR),"TRIPLETCOUNT":pvc_counts['PVC-Triplet_counter'],"peakslocation":peaksdefined}) # t_count
+                                                    if float(HR)>100.0:
+                                                        if "PVC-VT" in pvc_label and observer.count(1)>12:  #vt_count>=1 and bb.count(1)>12:
+                                                            result_data.update({"Arrhythmia":'VT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                        if "PVC-NSVT" in pvc_label and observer.count(1) <= 12: #aivr_count>=1 and bb.count(1)<=12:                                                    
+                                                            result_data.update({"Arrhythmia":'NSVT',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+     
+                                                    if float(HR)<=100.0:
+                                                        if "PVC-Ivr" in pvc_label: #ivr_count>=1:
+                                                            result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
+                                                elif lbbb_rbbb_label and int(version) in [5, 8] and 1 in newpvcswide and int(HR)<100:
+                                                    if lbbb_rbbb_label == "LBBB":
+                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB", "HR": int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    elif lbbb_rbbb_label == "RBBB":
+                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB", "HR": int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                else:
+                                                    wideq = wide_qrs_detection(low_es, fs=200)
+                                                    if wideq["wideqrs_label"]=="Wide_QRS" and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
+                                                        widelens = len(wideq["wideqrs_index"])
+                                                        if widelens>5 and (1 in newpvcswide):
+                                                            result_data.update({"Arrhythmia":'WIDE-QRS',"Count":widelens,"peakslocation":peaksdefined})
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+
+                                                d3 = result_data
+                                                finddata.append(d3)
+
+                                            if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"] and int(timetaken)>6:
+                                                # pac_r_index = check_r_index(all_lead_data, fs, int(version))
+                                    
+                                                pac_detection_result = PACDetection(all_lead_data, rpeaks, fs, is_lead=int(version)).get_pac_data()
+                                                actaulPAC = []
+                                                pac_label, jr_label = '', ''
+                                                forpac = 0
+                                                if 'updated_union' in pac_detection_result:
+                                                    actaulPAC = pac_detection_result['updated_union']
+                                                if 'pac_label' in pac_detection_result:
+                                                    pac_label = pac_detection_result['pac_label']
+                                                if 'pac_counts' in pac_detection_result:
+                                                    pac_counts = pac_detection_result['pac_counts']
+                                                if 'forPAC' in pac_detection_result:
+                                                    forPAC = pac_detection_result['forPAC']
+                                                if 'jnc_label' in pac_detection_result:
+                                                    jr_label = pac_detection_result['jnc_label']
+                                                # finaliso = actaulPAC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - pac_c_count*2 - pac_t_count*3
+                                                if pac_label:
+                                                    if 'PAC-Isolated' in pac_label and forPAC>6: # actaulPAC.count(1)>0
+                                                        result_data.update({"Arrhythmia":'PAC-Isolated',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"ISOPAC":abs(pac_counts['PAC-Isolated_counter'])})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    if  'PAC-Quadrigem' in pac_label and forPAC>6: # Quadgem_count>=1
+                                                        result_data.update({"Arrhythmia":'PAC-Quadrigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACQUADRIGEMCOUNT":pac_counts['PAC-Quadrigem_counter']}) # Quadgem_count
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+
+                                                    if 'PAC-Trigem' in pac_label and forPAC>6: # Trigem_count>=1
+                                                        result_data.update({"Arrhythmia":'PAC-Trigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIGEMCOUNT":pac_counts['PAC-Trigem_counter']}) # Trigem_count
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+
+                                                    if 'PAC-Bigem' in pac_label and forPAC>6: # bigem_count>=1
+                                                        result_data.update({"Arrhythmia":'PAC-Bigeminy',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACBIGEMCOUNT":pac_counts['PAC-Bigem_counter']}) # bigem_count
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+
+                                                    if 'PAC-Couplet' in pac_label and forPAC>6: # pac_c_count>=1
+                                                        result_data.update({"Arrhythmia":'PAC-Couplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACCOUPLETCOUNT":pac_counts['PAC-Couplet_counte']}) # pac_c_count
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+
+                                                    if 'PAC-Triplet' in pac_label and forPAC>6: # pac_t_count>=1
+                                                        result_data.update({"Arrhythmia":'PAC-Triplet',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR),"PACTRIPLETCOUNT":pac_counts['PAC-Triplet_counter']}) # pac_t_count
+                                                        d3 = result_data 
+                                                        finddata.append(d3)
+
+                                                    if float(HR)>=150.0:
+                                                        if 'SVT' in pac_label: # at_count>=1
+                                                            result_data.update({"Arrhythmia":'SVT',"PACTOTALCOUNT":actaulPAC.count(1),"HR":int(HR)})
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+
+                                            tf.keras.backend.clear_session()
+                                            if int(HR)<=80 and int(timetaken)>6 and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
+                                                try:
+                                                    jnrhy = jr_label
+                                                    if jnrhy=="Junctional_Rhythm":
+                                                        result_data.update({"Arrhythmia":'JN-RHY', "HR": int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    elif jnrhy=="Junctional_Bradycardia":                                
+                                                        result_data.update({"Arrhythmia":'JN-BR', "HR": int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                except:
+                                                    print("JN ISSUE")
+                                            
+                                            if float(HR)>100 and result_data["Arrhythmia"]=="":
+                                                result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
+                                                d2 = result_data
+                                                finddata.append(d2)
+
+                                            if result_data['Arrhythmia']=='' and rrint == "REGULAR":
+                                                result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
+                                                d3 = result_data
+                                                finddata.append(d3)
+                                                
+                                            if (result_data['Arrhythmia']=='BR' or result_data['Arrhythmia']=='Short Pause' or result_data['Arrhythmia']=='Normal' or result_data['Arrhythmia']=='') and int(HR)<80 and int(timetaken)>=7:
+                                                try:
+                                                    block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
+                                                    final_label = block_results['block_label']
+                                                    ei_ti_block = block_results['ei_ti_label']
+                                                    if final_label == "III Degree": 
+                                                        result_data.update({"Arrhythmia":'III Degree', "HR": int(HR)})
+                                                        for ei_ti_blockdata in ei_ti_block:
+                                                            result_data["threeLatter"].append(ei_ti_blockdata)
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    elif final_label == "MOBITZ-I":
+                                                        result_data.update({"Arrhythmia":'MOBITZ-I', "HR": int(HR)})
+                                                        for ei_ti_blockdata in ei_ti_block:
+                                                            result_data["threeLatter"].append(ei_ti_blockdata)
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    elif final_label == "MOBITZ-II":
+                                                        result_data.update({"Arrhythmia":'MOBITZ-II', "HR": int(HR)})
+                                                        for ei_ti_blockdata in ei_ti_block:
+                                                            result_data["threeLatter"].append(ei_ti_blockdata)
+                                                        
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+
+                                                    else:
+                                                        if result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","WIDE-QRS","SVT",'PAC-Triplet','PAC-Couplet','PAC-Bigeminy','PAC-Trigeminy','PAC-Quadrigeminy','PAC-Isolated','ABNORMAL','Long Pause','Short Pause'] and rrint == "IRREGULAR":
+                                                            result_data.update({"Arrhythmia":'SINUS-ARR', "HR": int(HR)})
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+                                                except Exception as e:
+                                                    print("MOBITZ-I,MOBITZ-II,III Degree issue",e)
+                                                    
+                                            if result_data['Arrhythmia']=='' and rrint == "IRREGULAR":
+                                                result_data.update({"Arrhythmia":'SINUS-ARR', "HR": int(HR)})
+                                                d3 = result_data
+                                                finddata.append(d3)
+
+                                            if (result_data['Arrhythmia']=='Normal' or rrint=="REGULAR") and int(HR)<100 and int(timetaken)>7:
+                                                try:
+                                                    b, a = signal.butter(3, 0.3, btype='lowpass', analog=False)
+                                                    low_passed = signal.filtfilt(b, a, newdada)
+                                                    rpeaksnew = detect_beats(low_passed, float(fa))
+                                                    _, waves_peak = nk.ecg_delineate(low_passed, unique(rpeaksnew), sampling_rate=fa, method="peak")
+                                                    signal_dwt, waves_dwt = nk.ecg_delineate(low_passed, unique(rpeaksnew), sampling_rate=fa, method="dwt")
+                                                    firststblock =[]
+                                                    rpeaks1 = unique(rpeaksnew)
+                                                    Ppeaks = unique(waves_peak['ECG_P_Peaks'])
+                                                    
+                                                    #dwt method
+                                                    for iii in range(len(Ppeaks)):
+                                                        if np.isnan(Ppeaks[iii]):
+                                                            Ppeaks[iii]=0
+                                                            firststblock.append(0)
+                                                        else:
+                                                            difff = rpeaksnew[iii]-Ppeaks[iii]
+                                                            firststblock.append((difff*5)/1000)
+                                                    firstblockfinal=[]
+                                                    for findtime in firststblock:
+                                                        if findtime>0.26:
+                                                            firstblockfinal.append(findtime)
+
+                                                    if len(firstblockfinal)>5:
+                                                        result_data.update({"Arrhythmia":'I DEGREE',"PRInterval":firstblockfinal[0], "HR": int(HR)})
+                                                        d3 = result_data
+                                                        finddata.append(d3)
+                                                    else:
+                                                        pass
+                                                except:
+                                                    print("I degree issue")
+
+                                            try:    
+                                                pace_label, pacemaker_index, r_index, q_index, s_index, p_index = pacemaker_detect(low_es, fs= 200)
+                                                if pace_label == "Atrial_Pacemaker":
+                                                    result_data.update({"ATRIAL_PACEMAKER":True})
                                                     d3 = result_data
                                                     finddata.append(d3)
-                                                else:
-                                                    pass
+
+                                                if pace_label == "Ventricular_Pacemaker":
+                                                    result_data.update({"VENTRICULAR_PACEMAKER":True})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+
+                                                if pace_label == "Atrial_&_Ventricular_pacemaker":
+                                                    result_data.update({"AV_PACEMAKER":True})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
                                             except:
-                                                print("I degree issue")
+                                                print("PACEMAKER ISSUE")
 
-                                        try:    
-                                            pace_label, pacemaker_index, r_index, q_index, s_index, p_index = pacemaker_detect(low_es, fs= 200)
-                                            if pace_label == "Atrial_Pacemaker":
-                                                result_data.update({"ATRIAL_PACEMAKER":True})
-                                                d3 = result_data
-                                                finddata.append(d3)
+                                            try:
+                                                naMI = np.array(newdada)
+                                                if int(HR)<100 and int(timetaken)>6 and int(version)==5 and rrint=="REGULAR":
 
-                                            if pace_label == "Ventricular_Pacemaker":
-                                                result_data.update({"VENTRICULAR_PACEMAKER":True})
-                                                d3 = result_data
-                                                finddata.append(d3)
-
-                                            if pace_label == "Atrial_&_Ventricular_pacemaker":
-                                                result_data.update({"AV_PACEMAKER":True})
-                                                d3 = result_data
-                                                finddata.append(d3)
-                                        except:
-                                            print("PACEMAKER ISSUE")
-
-                                        try:
-                                            naMI = np.array(newdada)
-                                            if int(HR)<100 and int(timetaken)>6 and int(version)==5 and rrint=="REGULAR":
-                                                # label_rlbbb = LBBB_RBBB(b_es,rpeaks,imageresource)
-
-                                                all_lead_data = raw_data_to_voltage_convert(sorted_data, int(version)) #, path=save, patient_id
-                                                if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
-                                                    label_mi = check_mi_model(all_lead_data, imageresource)
-                                                    # if lbbb_rbbb_label == "LBBB": 
-                                                    #     result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
-                                                    #     d3 = result_data
-                                                    #     finddata.append(d3)
-                                                    # elif lbbb_rbbb_label == 'RBBB': 
-                                                    #     result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
-                                                    #     d3 = result_data
-                                                    #     finddata.append(d3)                                               
-                                                    if label_mi == "Inferior STEMI":
-                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Inferior MI"})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-                                                    elif label_mi == "Lateral STEMI":
-                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Lateral MI"})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-                                                    elif label_mi == "T_wave_Abnormality":
-                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"T wave Abnormality"})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-                                        except:
-                                            print("Error in MI")
-                                            
-                                        if result_data['Arrhythmia']=='' and int(HR)>100:
-                                                result_data.update({"Arrhythmia":'TC'})
-                                                d3 = result_data
-                                                finddata.append(d3)
-                                            
-                                        if result_data['Arrhythmia']=='' and int(HR)<60:
-                                                result_data.update({"Arrhythmia":'BR'})
-                                                d3 = result_data
-                                                finddata.append(d3)
-                                            
-                                        if result_data['Arrhythmia']=='' and int(HR)>60 and int(HR)<100:
-                                                result_data.update({"Arrhythmia":'Normal'})
-                                                d3 = result_data
-                                                finddata.append(d3)
-                                        
-                                        newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
-
-                                        print("LOG:",newdata)
-                                        if allarr == 'All-Arrhythmia':
-                                            if int(result_data['HR'])<=20:
-                                                mintime = min(datetimee)
-                                                maxtime = max(datetimee)
-                                                result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                print("FinalLog:",result_data)
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            else:
+                                                    all_lead_data = data_convert_MI(sorted_data, int(version)) #, path=save, patient_id
+                                                    if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
+                                                        label_mi = check_mi_model(all_lead_data, imageresource)
+                                                                                                    
+                                                        if label_mi == "Inferior STEMI":
+                                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Inferior MI", "HR": int(HR) })
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+                                                        elif label_mi == "Lateral STEMI":
+                                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Lateral MI", "HR": int(HR)})
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+                                                        elif label_mi == "T_wave_Abnormality":
+                                                            result_data.update({"Arrhythmia":'ABNORMAL',"MI":"T wave Abnormality", "HR": int(HR)})
+                                                            d3 = result_data
+                                                            finddata.append(d3)
+                                            except:
+                                                print("Error in MI")
                                                 
-                                                for i in newdata:
-                                                    x = mycol.insert_one(dict(i))
+                                            if result_data['Arrhythmia']=='' and int(HR)>100:
+                                                    result_data.update({"Arrhythmia":'TC', "HR": int(HR)})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+                                                
+                                            if result_data['Arrhythmia']=='' and int(HR)<60:
+                                                    result_data.update({"Arrhythmia":'BR', "HR": int(HR)})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+                                                
+                                            if result_data['Arrhythmia']=='' and int(HR)>60 and int(HR)<100:
+                                                    result_data.update({"Arrhythmia":'Normal', "HR": int(HR)})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+                                            
+                                            newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
+
+                                            print("LOG:",newdata)
+                                            if allarr == 'All-Arrhythmia':
+                                                if int(result_data['HR'])<=20 or result_data['Arrhythmia']=='':
+                                                    result_data["HR"]= 0
+                                                    result_data["Arrhythmia"]='Artifacts'
+                                                    result_data["beats"]=0
+                                                    result_data["RRInterval"]=0
+                                                    result_data["PRInterval"]=0
+                                                    result_data["QTInterval"]=0
+                                                    result_data["QRSComplex"]=0
+                                                    result_data["STseg"]=0
+                                                    result_data["PRseg"]=0
+                                                    result_data["Vbeats"]=0
+                                                    result_data["noOfPause"]=0
+                                                    result_data["ISOLATEDCOUNT"]=0
+                                                    result_data["COUPLETCOUNT"]=0
+                                                    result_data["TRIPLETCOUNT"]=0
+                                                    result_data["PACTRIPLETCOUNT"]=0
+                                                    result_data["PACCOUPLETCOUNT"]=0
+                                                    result_data["ISOPAC"]=0
+                                                    result_data["PACTOTALCOUNT"]=0
+                                                    result_data["HRV"]=[]
+                                                    result_data["RR"]= 0
+                                                    publish_list = [result_data]
+                                                    print("FinalLog:",publish_list)
+                                                    client.publish(topic_y,json.dumps(publish_list),qos=2)
+                                                else:
+                                                    
+                                                    for i in newdata:
+                                                        x = mycol.insert_one(dict(i))
+                                                    client.publish(topic_y,json.dumps(newdata),qos=2)
+                                                    end = time.time()
+                                                    print("Time Taken:",end-start)
+                                            else:
                                                 client.publish(topic_y,json.dumps(newdata),qos=2)
                                                 end = time.time()
                                                 print("Time Taken:",end-start)
-                                        else:
-                                            client.publish(topic_y,json.dumps(newdata),qos=2)
-                                            end = time.time()
-                                            print("Time Taken:",end-start)
 
-                                    except Exception as e:
-                                        print("DATA Corrupted inside",e)
-                                        tb = traceback.extract_tb(e.__traceback__)
-                                        line_number = tb[-1][1]  # Extract the line number from the last entry in the traceback
-                                        print(f"Exception occurred on line {tb}: {tb}")
-                                        result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]                                                   
-                                        print("LOG:",result_data)
-                                        client.publish(topic_y,json.dumps(result_data),qos=2)
+                                        except Exception as e:
+                                            print("DATA Corrupted inside",e)
+                                            tb = traceback.extract_tb(e.__traceback__)
+                                            line_number = tb[-1][1]  # Extract the line number from the last entry in the traceback
+                                            print(f"Exception occurred on line {tb}: {tb}")
+                                            result_data["HR"]= 0
+                                            result_data["Arrhythmia"]='Artifacts'
+                                            result_data["beats"]=0
+                                            result_data["RRInterval"]=0
+                                            result_data["PRInterval"]=0
+                                            result_data["QTInterval"]=0
+                                            result_data["QRSComplex"]=0
+                                            result_data["STseg"]=0
+                                            result_data["PRseg"]=0
+                                            result_data["Vbeats"]=0
+                                            result_data["noOfPause"]=0
+                                            result_data["ISOLATEDCOUNT"]=0
+                                            result_data["COUPLETCOUNT"]=0
+                                            result_data["TRIPLETCOUNT"]=0
+                                            result_data["PACTRIPLETCOUNT"]=0
+                                            result_data["PACCOUPLETCOUNT"]=0
+                                            result_data["ISOPAC"]=0
+                                            result_data["PACTOTALCOUNT"]=0
+                                            result_data["HRV"]=[]
+                                            result_data["RR"]= 0  
+                                            result_data["offline"]= True
+                                            publish_list = [result_data]                                                 
+                                            print("LOG:",publish_list)
+                                            client.publish(topic_y,json.dumps(publish_list),qos=2)
 
 
             except Exception as e:
@@ -5969,7 +5958,6 @@ def subscribe(client):
         else:
             time.sleep(0.1)
             pass
-
 
 def run():
     while True:
