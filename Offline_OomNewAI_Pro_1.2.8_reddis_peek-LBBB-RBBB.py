@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import random
 from paho.mqtt import client as mqtt_client
 import traceback
@@ -221,7 +222,7 @@ output_details_noise = interpreter_noise.get_output_details()
 
 with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
-    vfib_vfl_model = load_tflite_model("vfib_trans_mob_5_enhanced.tflite")
+    vfib_vfl_model = load_tflite_model("vfib_trans_mob_6_enhanced.tflite")
     pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_31.tflite")
     block_load_model = load_tflite_model("Block_Trans_mob_16_super_new.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
@@ -306,7 +307,7 @@ def extract_number(filename):
     match = re.search(r'(\d+)', os.path.basename(filename))
     return int(match.group(1)) if match else float('inf')
 
-def check_vfib_vfl_model(ecg_signal, vfib_vfl_model):
+def check_vfib_vfl_model(ecg_signal):
     baseline_signal = baseline_construction_200(ecg_signal)
     low_ecg_signal= lowpass(baseline_signal, cutoff=0.2)
     label = 'Abnormal'
@@ -397,22 +398,23 @@ def Vfib_asys_detection(all_leads_data, is_lead=2):
             lead_data['vfib_result'] = vi_model_result
             all_lead_det_data[lead] = lead_data
             vifib_results.append(vi_model_result)
-    if len(all_lead_det_data.keys()) > 1:
-        flat_list = []
-        for element in vifib_results:
-            if isinstance(element, list):
-                flat_list.extend(element)
+    if all_lead_det_data:
+        if len(all_lead_det_data.keys()) > 1:
+            flat_list = []
+            for element in vifib_results:
+                if isinstance(element, list):
+                    flat_list.extend(element)
+                else:
+                    flat_list.append(element)
+            counts = Counter(flat_list)
+            repeated_elements = [item for item, count in counts.items() if count > rep_thresh and item != 'Abnormal']
+            vfib_vfl_lab = ' '.join(repeated_elements)
+            if vfib_vfl_lab:
+                vifib_asys_result = vfib_vfl_lab
             else:
-                flat_list.append(element)
-        counts = Counter(flat_list)
-        repeated_elements = [item for item, count in counts.items() if count > rep_thresh and item != 'Abnormal']
-        vfib_vfl_lab = ' '.join(repeated_elements)
-        if vfib_vfl_lab:
-            vifib_asys_result = vfib_vfl_lab
+                vifib_asys_result = "Abnormal"
         else:
-            vifib_asys_result = "Abnormal"
-    else:
-        vifib_asys_result =  all_lead_det_data['II']['vfib_result']
+            vifib_asys_result =  all_lead_det_data['II']['vfib_result']
     return vifib_asys_result
 
 def image_array_new(signal):
@@ -3724,7 +3726,7 @@ def check_mi_model(all_leads_data, imageresource):
         mi_result = "T_wave_Abnormality"
     return mi_result
 
-def data_convert_MI(sorted_data, version): # patient_id, path=None
+def raw_data_to_voltage_convert(sorted_data, version): # patient_id, path=None
     A = pd.DataFrame(sorted_data)[['dateTime', 'data']]
     try:
         tog_arr = 0
@@ -3738,11 +3740,11 @@ def data_convert_MI(sorted_data, version): # patient_id, path=None
             if temp_A['data1'][0]=="": tog_arr = 1
             A1 = temp_A['data1'].to_list()
             A5 = temp_A['data5'].to_list()
-            v1 = A['vOne'].to_list()
-            v2 = A['vTwo'].to_list()
-            v3 = A['vThree'].to_list()
-            v4 = A['vFour'].to_list()
-            v6 = A['vSix'].to_list()
+            v1 = temp_A['vOne'].to_list()
+            v2 = temp_A['vTwo'].to_list()
+            v3 = temp_A['vThree'].to_list()
+            v4 = temp_A['vFour'].to_list()
+            v6 = temp_A['vSix'].to_list()
         else: 
             tog_arr = 1
     except Exception as e:
@@ -3958,7 +3960,7 @@ def check_r_index(all_leads_data, frequency, version):
     combine_r_index = {}
     
     for lead in all_leads_data.keys():
-        if lead in ["I",'II', 'III']:
+        if lead in ["I","II", "III", "v1", "v5"]:
             ecg_signal = all_leads_data[lead].values
             baseline_signal = baseline_construction_200(ecg_signal, 101)
             lowpass_signal = lowpass(baseline_signal)
@@ -3969,6 +3971,9 @@ def check_r_index(all_leads_data, frequency, version):
     elif version == 5:
         min_length = min(len(combine_r_index['I']), len(combine_r_index['II']), len(combine_r_index['III']))
         median_r_list = [int(np.median([combine_r_index['I'][i], combine_r_index['II'][i], combine_r_index['III'][i]])) for i in range(min_length)]
+    elif version == 8:
+        min_length = min(len(combine_r_index['I']), len(combine_r_index['II']), len(combine_r_index['III']), len(combine_r_index['v1']), len(combine_r_index['v5']))
+        median_r_list = [int(np.median([combine_r_index['I'][i], combine_r_index['II'][i], combine_r_index['III'][i], combine_r_index['v1'][i], combine_r_index['v5'][i]])) for i in range(min_length)]
     #print(median_r_list, "median_r_list", type(median_r_list))
     return median_r_list
 
@@ -3978,7 +3983,7 @@ def check_qs_index(all_leads_data, r_index ,frequency, version):
     combine_indexs = {}
     
     for lead in all_leads_data.keys():
-        if lead in ["I",'II', 'III']:
+        if lead in ["I","II", "III", "v1", "v5"]:
             ecg_signal = all_leads_data[lead].values
             baseline_signal = baseline_construction_200(ecg_signal, 101)
             lowpass_signal = lowpass(baseline_signal)
@@ -3997,6 +4002,13 @@ def check_qs_index(all_leads_data, r_index ,frequency, version):
         s_index = median_s_list
         min_q_length = min(len(combine_indexs['I']['q_idx']), len(combine_indexs['II']['q_idx']), len(combine_indexs['III']['q_idx']))
         median_q_list = [int(np.median([combine_indexs['I']['q_idx'][i], combine_indexs['II']['q_idx'][i], combine_indexs['III']['q_idx'][i]])) for i in range(min_q_length)]
+        q_index = median_q_list
+    elif version == 8:
+        min_s_length = min(len(combine_indexs['I']['s_idx']), len(combine_indexs['II']['s_idx']), len(combine_indexs['III']['s_idx']), len(combine_indexs['v1']['s_idx']), len(combine_indexs['v5']['s_idx']))
+        median_s_list = [int(np.median([combine_indexs['I']['s_idx'][i], combine_indexs['II']['s_idx'][i], combine_indexs['III']['s_idx'][i], combine_indexs['v1']['s_idx'][i], combine_indexs['v5']['s_idx'][i]])) for i in range(min_s_length)]
+        s_index = median_s_list
+        min_q_length = min(len(combine_indexs['I']['q_idx']), len(combine_indexs['II']['q_idx']), len(combine_indexs['III']['q_idx']), len(combine_indexs['v1']['q_idx']), len(combine_indexs['v5']['q_idx']))
+        median_q_list = [int(np.median([combine_indexs['I']['q_idx'][i], combine_indexs['II']['q_idx'][i], combine_indexs['III']['q_idx'][i], combine_indexs['v1']['q_idx'][i], combine_indexs['v5']['q_idx'][i]])) for i in range(min_q_length)]
         q_index = median_q_list
     return s_index, q_index
 
@@ -4041,14 +4053,22 @@ class PVCDetection:
                     ivr_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
-                elif 5 <= length <= 12 and (int(HR)>60 and int(HR)<=300):
-                    nsvt_count += 1
-                    for j in range(start, i):
-                        beat_indices.add(j)
-                elif length >= 13 and int(HR)>100:
+                elif sequence.count(1)>=13 and length >= 5 and int(HR)>100:
                     vt_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
+                elif sequence.count(1)<=12 and 5 <= length <= 12 and (int(HR)>60 and int(HR)<=300):
+                    nsvt_count += 1
+                    for j in range(start, i):
+                        beat_indices.add(j)
+#                elif 5 <= length <= 12 and (int(HR)>60 and int(HR)<=300):
+#                    nsvt_count += 1
+#                    for j in range(start, i):
+#                        beat_indices.add(j)
+#                elif length >= 13 and int(HR)>100:
+#                    vt_count += 1
+#                    for j in range(start, i):
+#                        beat_indices.add(j)
             else:
                 i += 1
     
@@ -4147,13 +4167,8 @@ class PVCDetection:
                     ecg_signal = all_lead_data[lead]
                     lis= []
                     count= 1
-                    if self.is_lead == 2:
-                        base_ecg = baseline_construction_200(ecg_signal,101)
-                        pvc_data = lowpass(base_ecg)
-                        
-                    else:
-                        base_ecg = baseline_construction_200(ecg_signal,101)
-                        pvc_data = lowpass(base_ecg)
+                    base_ecg = baseline_construction_200(ecg_signal,101)
+                    pvc_data = lowpass(base_ecg)
                     
                         
                     aboutdatas = pd.DataFrame(pvc_data)
@@ -4205,7 +4220,17 @@ class PVCDetection:
                     for pvcfilename in files:
                         predictions,ids = prediction_model(pvcfilename)
                         # print(predictions,ids)
-                        if str(ids) == "PVC" and float(predictions[3])>0.92:
+                        if self.is_lead == 5:
+                            for_pvc_leads = ['I', 'II', 'III']
+                            for_lbbb_rbbb_leads = ['I', 'aVL', 'V5']
+                        elif self.is_lead == 8:
+                            for_pvc_leads = ['I','II','III', 'v1', 'v5']
+                            for_lbbb_rbbb_leads = ['I', 'aVL', 'v1', 'v5','v6'] 
+                        else:
+                            for_pvc_leads = ['II']
+                            for_lbbb_rbbb_leads = []
+
+                        if (str(ids) == "PVC" and float(predictions[3])>0.92) and lead in for_pvc_leads:
                             observer.append(1)
                             plot_r_index = int(pvcfilename.split("_")[-1].split(".jpg")[0])
                             if lead == 'II':
@@ -4215,12 +4240,12 @@ class PVCDetection:
                         else:
                             observer.append(0)
 
-                        if str(ids) == "LBBB" and float(predictions[0]) > 0.78:
+                        if (str(ids) == "LBBB" and float(predictions[0]) > 0.78) and lead in for_lbbb_rbbb_leads:
                             LBBB_list.append(1)
                         else:
                             LBBB_list.append(0)
 
-                        if str(ids) == "RBBB" and float(predictions[4]) > 0.78:
+                        if (str(ids) == "RBBB" and float(predictions[4]) > 0.78) and lead in for_lbbb_rbbb_leads:
                             RBBB_list.append(1)
                         else:
                             RBBB_list.append(0)
@@ -4294,18 +4319,25 @@ class PVCDetection:
                 ]
                 if pvc_matching_keys:
                     result_pvc_data['pvc_index'] = all_lead_pvc_data[pvc_matching_keys[0]]['pvc_index']
+                    result_pvc_data['pvc_counts']= all_lead_pvc_data[pvc_matching_keys[0]]['count_dict']
                 else:
                     result_pvc_data['pvc_index'] = []
-                result_pvc_data['pvc_counts']= all_lead_pvc_data[pvc_matching_keys[0]]['count_dict']
-                if label_counts['RBBB'] == 3 or label_counts['LBBB'] == 3:
+                    result_pvc_data['pvc_counts']= {}
+
+                if self.is_lead == 5:
+                    l_r_thresh = 2
+                elif self.is_lead == 8:
+                    l_r_thresh = 3
+
+                if label_counts['RBBB'] == l_r_thresh or label_counts['LBBB'] == l_r_thresh:
                     result_pvc_data['lbbb_rbbb_label'] = lbbb_rbbb_label
                     lbbb_rbbb_matching_keys = [
                         key for key, data in all_lead_pvc_data.items()
                         if any(element in data['lbbb_rbbb_label'] for element in repeated_elements)
                     ]
-                    if label_counts['RBBB'] == 3:
+                    if label_counts['RBBB'] == l_r_thresh:
                         result_pvc_data['rbbb_index'] = all_lead_pvc_data[lbbb_rbbb_matching_keys[0]]['rbbb_index']
-                    if label_counts['LBBB'] == 3:
+                    if label_counts['LBBB'] == l_r_thresh:
                         result_pvc_data['lbbb_index'] = all_lead_pvc_data[lbbb_rbbb_matching_keys[0]]['lbbb_index']
                     
                 else:
@@ -5043,7 +5075,7 @@ def subscribe(client):
                         fs = 200
                         all_lead_data = {}
                         if int(version) == 5 or int(version) == 8:
-                            all_lead_data = data_convert_MI(sorted_data, int(version))
+                            all_lead_data = raw_data_to_voltage_convert(sorted_data, int(version))
                         elif int(version) == 2:
                             all_lead_data = pd.DataFrame({'II': OriginalSignal})
                         final_output = noise_engine(all_lead_data, int(version))
@@ -5308,24 +5340,24 @@ def subscribe(client):
 
                                         HR = int(60*int(len(rpeaks))/(timetaken))
                                         if HR>60 and HR<100:
-                                            if int(version) == 5:
-                                                label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
-                                                if label_rlbbb=="LBBB":
-                                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                    print("LOG:",result_data)
-                                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                                                elif label_rlbbb=="RBBB":
-                                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                    print("LOG:",result_data)
-                                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                                                else:
-                                                    result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                    print("LOG:",result_data)
-                                                    client.publish(topic_y,json.dumps(result_data),qos=2)
-                                            else:
-                                                result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
-                                                print("LOG:",result_data)
-                                                client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            # if int(version) == 5:
+                                            #     label_rlbbb = LBBB_RBBB(na,rpeaks,imageresource)
+                                            #     if label_rlbbb=="LBBB":
+                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"LBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                            #         print("LOG:",result_data)
+                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            #     elif label_rlbbb=="RBBB":
+                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"MI":"RBBB","templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                            #         print("LOG:",result_data)
+                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            #     else:
+                                            #         result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                            #         print("LOG:",result_data)
+                                            #         client.publish(topic_y,json.dumps(result_data),qos=2)
+                                            # else:
+                                            result_data = [{"patient":dd["patient"],"HR":str(HR),"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Normal','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":hrv,"RR":br,"templateBeat":beats,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
+                                            print("LOG:",result_data)
+                                            client.publish(topic_y,json.dumps(result_data),qos=2)
 
                                         else:
                                             result_data = [{"patient":dd["patient"],"HR":0,"starttime":mintime,"endtime":maxtime,"Arrhythmia":'Artifacts','kit':dd["kit"],'position':positionFinal,"beats":0,"RRInterval":0,"PRInterval":0,"QTInterval":0,"QRSComplex":0,"STseg":0,"PRseg":0,"Vbeats":0,"noOfPause":0,"ISOLATEDCOUNT":0,"COUPLETCOUNT":0,"TRIPLETCOUNT":0,"PACTRIPLETCOUNT":0,"PACCOUPLETCOUNT":0,"ISOPAC":0,"PACTOTALCOUNT":0,"trigger":trigger,"offline":True,"rpmId":rpmId,"version":version,"patientData":patientData,"coordinates":coordinates,"datalength":datalength,"HRV":[],"RR":0,"battery":battery ,"memoryUtilized": memoryUtilized,"sysncDataReaming":sysncDataReaming,"mobileBaterry":mobileBaterry}]
@@ -5614,7 +5646,7 @@ def subscribe(client):
                                               d1 = result_data
                                               finddata.append(d1)
 
-
+                                        patientid = dd["patient"]
                                         layer2 = newpvcs
                                         if 1 in layer2:
                                             if os.path.exists("pvcs/"+patientid):
@@ -5665,6 +5697,15 @@ def subscribe(client):
                                                     if "PVC-Ivr" in pvc_label: #ivr_count>=1:
                                                         result_data.update({"Arrhythmia":'IVR',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
 
+                                            elif lbbb_rbbb_label and int(version) in [5, 8] and 1 in newpvcswide and int(HR)<100:
+                                                if lbbb_rbbb_label == "LBBB":
+                                                    result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
+                                                elif lbbb_rbbb_label == "RBBB":
+                                                    result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
+                                                    d3 = result_data
+                                                    finddata.append(d3)
                                             else:
                                                 wideq = wide_qrs_detection(low_es, fs=200)
                                                 if wideq["wideqrs_label"]=="Wide_QRS" and result_data["Arrhythmia"] not in ["PVC-Isolated", "PVC-Quadrigeminy", "PVC-Trigeminy","PVC-Bigeminy","PVC-Couplet","PVC-Triplet","VT","IVR","NSVT","AFIB","AFL"]:
@@ -5683,7 +5724,7 @@ def subscribe(client):
                                             pac_detection_result = PACDetection(all_lead_data, pac_r_index, fs, is_lead=int(version)).get_pac_data()
                                             actaulPAC = []
                                             pac_label, jr_label = '', ''
-                                            forpac = 0
+                                            forPAC = 0
                                             if 'updated_union' in pac_detection_result:
                                                 actaulPAC = pac_detection_result['updated_union']
                                             if 'pac_label' in pac_detection_result:
@@ -5691,7 +5732,7 @@ def subscribe(client):
                                             if 'pac_counts' in pac_detection_result:
                                                 pac_counts = pac_detection_result['pac_counts']
                                             if 'variations' in pac_detection_result:
-                                                forpac = Average(pac_detection_result['variations'])
+                                                forPAC = Average(pac_detection_result['variations'])
                                             if 'jnc_label' in pac_detection_result:
                                                 jr_label = pac_detection_result['jnc_label']
                                             # finaliso = actaulPAC.count(1) - Quadgem_count*2 - Trigem_count*2 - bigem_count*2 - pac_c_count*2 - pac_t_count*3
@@ -5844,20 +5885,20 @@ def subscribe(client):
                                         try:
                                             naMI = np.array(newdada)
                                             if int(HR)<100 and int(timetaken)>6 and int(version)==5 and rrint=="REGULAR":
-                                                label_rlbbb = LBBB_RBBB(b_es,rpeaks,imageresource)
+                                                # label_rlbbb = LBBB_RBBB(b_es,rpeaks,imageresource)
 
-                                                all_lead_data = data_convert_MI(sorted_data, int(version)) #, path=save, patient_id
+                                                all_lead_data = raw_data_to_voltage_convert(sorted_data, int(version)) #, path=save, patient_id
                                                 if len(all_lead_data) != 0 and len(all_lead_data['II'].values) > 500:
                                                     label_mi = check_mi_model(all_lead_data, imageresource)
-                                                    if lbbb_rbbb_label == "LBBB": 
-                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
-                                                        d3 = result_data
-                                                        finddata.append(d3)
-                                                    elif lbbb_rbbb_label == 'RBBB': 
-                                                        result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
-                                                        d3 = result_data
-                                                        finddata.append(d3)                                               
-                                                    elif label_mi == "Inferior STEMI":
+                                                    # if lbbb_rbbb_label == "LBBB": 
+                                                    #     result_data.update({"Arrhythmia":'ABNORMAL',"MI":"LBBB"})
+                                                    #     d3 = result_data
+                                                    #     finddata.append(d3)
+                                                    # elif lbbb_rbbb_label == 'RBBB': 
+                                                    #     result_data.update({"Arrhythmia":'ABNORMAL',"MI":"RBBB"})
+                                                    #     d3 = result_data
+                                                    #     finddata.append(d3)                                               
+                                                    if label_mi == "Inferior STEMI":
                                                         result_data.update({"Arrhythmia":'ABNORMAL',"MI":"Inferior MI"})
                                                         d3 = result_data
                                                         finddata.append(d3)
