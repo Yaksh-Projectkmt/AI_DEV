@@ -131,7 +131,7 @@ folder_path = os.path.join("rawdata/", random_folder_name)
 os.makedirs(folder_path)
 
 # Load the TFLite model
-interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_52_test_tiny_iter1.tflite')
+interpreterss = tf.lite.Interpreter(model_path='PVC_Trans_mob_53_test_tiny_iter1.tflite')
 interpreterss.allocate_tensors()
 
 # Get the input and output details
@@ -148,7 +148,7 @@ with tf.device('/CPU:0'):
     afib_load_model = load_tflite_model("afib_flutter_4_3.tflite")
     vfib_vfl_model = load_tflite_model("vfib_trans_mob_6_enhanced.tflite")
     pac_load_model = load_tflite_model("PAC_TRANS_GRU_mob_31.tflite")
-    block_load_model = load_tflite_model("Block_Trans_mob_16_super_new.tflite")
+    block_load_model = load_tflite_model("Block_Trans_mob_17_super_new.tflite")
     let_inf_moedel = load_tflite_model("ST_21_10.tflite")
     
 def prediction_model_PAC(input_arr, target_shape=[224, 224], class_name=True):
@@ -720,8 +720,8 @@ def baseline_als(y, lam, p, niter=10):
     return z
 
 
-def lowpass(file):
-    b, a = signal.butter(3, 0.2, btype='lowpass', analog=False)
+def lowpass(file,cut=0.2):
+    b, a = signal.butter(3, cut, btype='lowpass', analog=False)
     low_passed = signal.filtfilt(b, a, file)
     return low_passed
 
@@ -3516,7 +3516,7 @@ class PVCDetection:
                 while i < len(sequence) and sequence[i] == 1:
                     i += 1
                 length = i - start
-                if length == 4 and int(HR)<=100:
+                if length >= 4 and int(HR)<=100:
                     ivr_count += 1
                     for j in range(start, i):
                         beat_indices.add(j)
@@ -4234,15 +4234,16 @@ class BlockDetected:
         plt.axis("off")
         plt.savefig(f"temp_block_img/p_{randome_number}.jpg")
         aq = cv2.imread(f"temp_block_img/p_{randome_number}.jpg")
-        aq = cv2.resize(aq, (2400,360)) #1080, 460
-        cv2.imwrite(f"temp_block_img/p_{randome_number}.jpg", aq)
+        aq = cv2.resize(aq, (2400,360),interpolation=cv2.INTER_LANCZOS4) #1080, 460
+        aq = Image.fromarray(cv2.cvtColor(aq, cv2.COLOR_BGR2RGB))
+        #cv2.imwrite(f"temp_block_img/p_{randome_number}.jpg", aq)
+        aq.save(f"temp_block_img/p_{randome_number}.jpg", dpi=(2000,700))
        
         plt.close()
         ei_ti_label, predictions = [], []
         files = sorted(glob.glob("temp_block_img/*.jpg"), key=extract_number)
         for pvcfilename in files:
             predictions, ids = self.prediction_model_block(pvcfilename, block_model)
-            # print(predictions, ids)
             label = "Abnormal" #"Normal"
             if str(ids) == "3rd_deg" and float(predictions[2]) > 0.80:
                 label = "3rd degree"
@@ -4262,20 +4263,20 @@ class BlockDetected:
 def block_model_check(ecg_signal, frequency, abs_result, block_model):
     model_label = 'Abnormal'
     ei_ti_block = []
-    baseline_signal = baseline_construction_200(ecg_signal)
-    lowpass_signal = lowpass(baseline_signal)
+    baseline_signal = baseline_construction_200(ecg_signal,131)
+    lowpass_signal = lowpass(baseline_signal,0.3)
     get_block = BlockDetected(ecg_signal, frequency)
     block_result, ei_ti_label, model_pre = get_block.check_block_model(lowpass_signal, block_model)
     if block_result == '1st degree' and abs_result != 'Abnormal':
         model_label = 'I DEGREE'
-    if block_result == '2nd degree' and (abs_result == '' or abs_result == 'Mobitz II' or abs_result == 'Mobitz I'):
-        if abs_result=="Mobitz I":
+    if block_result == '2nd degree' and (abs_result == '' or abs_result == 'Mobitz_II' or abs_result == 'Mobitz_I'):
+        if abs_result=="Mobitz_I":
             model_label = 'MOBITZ-I'
-        if abs_result=="Mobitz II":
+        if abs_result=="Mobitz_II":
             model_label = 'MOBITZ-II'
     if block_result == '3rd degree' and abs_result == "3rd Degree block": #abs_result!="Abnormal":
         model_label = 'III Degree'
-    if abs_result in ['1st deg. block', "3rd Degree block", 'Mobitz II', 'Mobitz I']:
+    if abs_result in ['1st deg. block', "3rd Degree block", 'Mobitz_II', 'Mobitz_I']:
         if block_result == '2nd degree':
             model_label = 'MOBITZ-I'
         elif block_result == '3rd degree':
@@ -4284,11 +4285,11 @@ def block_model_check(ecg_signal, frequency, abs_result, block_model):
         if '1st degree' in ei_ti_label and abs_result!="Abnormal":
             model_label = 'I DEGREE'
             ei_ti_block.append({"Arrhythmia":"I DEGREE","percentage":model_pre[0]*100})
-        if '2nd degree' in ei_ti_label and (abs_result == 'Mobitz I' or abs_result == 'Mobitz II'):
-            if abs_result=="Mobitz I":
+        if '2nd degree' in ei_ti_label and (abs_result == 'Mobitz_I' or abs_result == 'Mobitz_II'):
+            if abs_result=="Mobitz_I":
                 model_label = 'MOBITZ-I'
                 ei_ti_block.append({"Arrhythmia":"MOBITZ-I","percentage":model_pre[1]*100})
-            if abs_result=="Mobitz II":
+            if abs_result=="Mobitz_II":
                 model_label = 'MOBITZ-II'
                 ei_ti_block.append({"Arrhythmia":"MOBITZ-II","percentage":model_pre[1]*100})
         if '3rd degree' in ei_ti_label and abs_result!="Abnormal":
@@ -4304,10 +4305,10 @@ def block_detection_processing(all_lead_data, is_lead=2,  fs=200):
     all_block_labels, all_ei_ti_laels = [], []
     if is_lead == 5:
         analysis_lead = ['I', 'II', 'III']
-        rep_thresh = 2
+        rep_thresh = 1
     elif is_lead == 8:
         analysis_lead = ['I', 'II', 'III', 'v1', 'v5']
-        rep_thresh = 1
+        rep_thresh = 2
     else:
         analysis_lead = ['II']
     if len(all_lead_data) != 0:
@@ -4340,6 +4341,7 @@ def block_detection_processing(all_lead_data, is_lead=2,  fs=200):
             if all_block_labels:
                 labels_result = find_label_couter(all_block_labels)
                 counts = Counter(labels_result)
+                print(counts)
                 repeated_elements = [item for item, count in counts.items() if count > rep_thresh]
                 block_label = ' '.join(repeated_elements)
             if all_ei_ti_laels:
@@ -4349,11 +4351,11 @@ def block_detection_processing(all_lead_data, is_lead=2,  fs=200):
                 ei_ti_label = ' '.join(find_repeated)
         else:
             block_label = all_lead_result_data['II']['block_label']
-            ei_ti_label = all_lead_result_data['II']['ei_ti_block']
+            #ei_ti_label = all_lead_result_data['II']['ei_ti_block']
     
     result_dic = {
         'block_label': block_label,
-        'ei_ti_label': ei_ti_label
+        'ei_ti_label': [{}]
     }
     return result_dic
 
@@ -4378,109 +4380,38 @@ def subscribe(client: mqtt_client):
             #print(type(sorted_data),"========", sorted_data)
             
             newsublist = funcs(sorted_data)
-            battery = None
-            memoryUtilized = None
-            sysncDataReaming = None
-
-
-            dataerror =0
-            l = []
-            vol = []
-            co = []
-            newlist = []
-
             imageresource = folder_path
-            datetimee = []
-            leadlist=[]
-            allarr =''
-            trigger = False
-            rpmId=''
-            versionList = []
-            version = 0
-            patientData = {}
-            coordinates=[]
-            datalength = 0
-            mobileBaterry = None
-
-            newlist1 = []
-            positionX = []
-            positionY = []
-            positionZ = []
-            positionFinal = 0
             
+            trigger = dd['trigger'] if "trigger" in dd else False
+            rpmId= dd['rpmId'] if "rpmId" in dd else ''
+            version = dd['version'] if 'version' in dd else 0  
+            patientData = dd['patientData'] if "patientData" in dd else {}
+            coordinates= dd["coordinates"] if "coordinates" in dd else []
+            datalength = len(sorted_data)
+            mobileBaterry = dd['mobileBaterry'] if "mobileBaterry" in dd else None
+            patient = dd['patient'] if "patient" in dd else ''
+            allarr = dd['ecgPackage'] if "ecgPackage" in dd else ''
+            battery = dd['battery'] if "battery" in dd else None
+            memoryUtilized = dd['memoryUtilized'] if "memoryUtilized" in dd else None
+            sysncDataReaming = dd['sysncDataReaming'] if "sysncDataReaming" in dd else None
+            positionFinal = 0
+            positionX, positionY, positionZ = [], [], []
+
+            newlist, datetimee, leadlist = [], [], []
+
             for i in range(0,len(sorted_data)):
-                patient = dd['patient']
-                allarr =dd['ecgPackage']
-                try:
-                    try:
-                        version = dd['version']
-                    except:
-                        print("version not getting...")
-                        pass
-                        
-                    try:
-                        mobileBaterry = dd['mobileBaterry']
-                    except:
-                        print("mobileBaterry not getting...")
-                        pass
-                    
-                    try:
-                        trigger = dd['trigger']
-                    except:
-                        print("trigger not getting...")
-                        pass
-                        
-                    try:
-                        rpmId = dd['rpmId']
-                    except:
-                        print("rpmId not getting...")
-                        pass
-                    try:
-                        patientData = dd['patientData']
-                    except:
-                        print("patientData not getting...")
-                        pass  
-
-                    try:
-                        datalength = len(sorted_data)
-                    except:
-                        print("datalength not getting...")
-                        pass                          
-                        
-                    try:
-                        coordinates = dd["coordinates"]
-                    except:
-                        print("coordinates not getting...")
-                        pass
-                    try:
-                        battery = dd['battery']
-                    except:
-                        print("battery not getting...")
-                        pass  
-                    try:
-                        memoryUtilized = dd['memoryUtilized']
-                    except:
-                        print("memoryUtilized not getting...")
-                        pass
-                    try:
-                        sysncDataReaming = dd['sysncDataReaming']
-                    except:
-                        print("sysncDataReaming not getting...")
-                        pass                         
-                except Exception as e:
-                    pass
-
                 try:
                     positionX.append(sorted_data[i]['positionX'])
                     positionY.append(sorted_data[i]['positionY'])
                     positionZ.append(sorted_data[i]['positionZ'])
                 except:
                     pass
-
                 datetimee.append(sorted_data[i]['dateTime']) 
                 newlist.append(sorted_data[i]['data'])
                 leadlist.append(sorted_data[i]['lead'])
-                
+            
+            l = []
+            vol = []
             allstring = ''.join(newlist)
             print("VERSION:",version,"patient:",patient)
             for i in allstring:
@@ -4542,57 +4473,79 @@ def subscribe(client: mqtt_client):
 
                 result_data = {
                     "patient":dd["patient"],
-                    "HR":0, 
-                    "starttime":mintime,
-                    "endtime":maxtime,
-                    "Arrhythmia":'',
-                    'kit':dd["kit"],
-                    'position':positionFinal,
-                    "beats":0,
-                    "RRInterval":0,
-                    "PRInterval":0,
-                    "QTInterval":0,
-                    "QRSComplex":0,
-                    "STseg":0,
-                    "PRseg":0,
-                    "Vbeats":0,
-                    "noOfPause":0,
-                    "noOfPauseList":[],
-                    "ISOLATEDCOUNT":0,
-                    "COUPLETCOUNT":0,
-                    "TRIPLETCOUNT":0,
-                    "PACTRIPLETCOUNT":0,
-                    "PACCOUPLETCOUNT":0,
-                    "ISOPAC":0,
-                    "PACTOTALCOUNT":0,
-                    "ecgPackage":allarr,
-                    "trigger":trigger,
-                    "rpmId":rpmId,
-                    "version":version,
-                    "patientData":patientData,
-                    "coordinates":coordinates,
-                    "datalength":datalength,
-                    "HRV":[],
-                    "RR":0,
-                    "battery":battery ,
+                    "HR": 0, 
+                    "starttime": mintime,
+                    "endtime": maxtime,
+                    "Arrhythmia": '',
+                    'kit': dd["kit"],
+                    'position': positionFinal,
+                    "beats": 0,
+                    "RRInterval": 0,
+                    "PRInterval": 0,
+                    "QTInterval": 0,
+                    "QRSComplex": 0,
+                    "STseg": 0,
+                    "PRseg": 0,
+                    "Vbeats": 0,
+                    "noOfPause": 0,
+                    "noOfPauseList": [],
+                    "ISOLATEDCOUNT": 0,
+                    "COUPLETCOUNT": 0,
+                    "TRIPLETCOUNT": 0,
+                    "PACTRIPLETCOUNT": 0,
+                    "PACCOUPLETCOUNT": 0,
+                    "ISOPAC": 0,
+                    "PACTOTALCOUNT": 0,
+                    "ecgPackage": allarr,
+                    "trigger": trigger,
+                    "rpmId": rpmId,
+                    "version": version,
+                    "patientData": patientData,
+                    "coordinates": coordinates,
+                    "datalength": datalength,
+                    "HRV": [],
+                    "RR": 0,
+                    "battery": battery ,
                     "memoryUtilized": memoryUtilized,
-                    "sysncDataReaming":sysncDataReaming,
-                    "mobileBaterry":mobileBaterry
+                    "sysncDataReaming": sysncDataReaming,
+                    "mobileBaterry": mobileBaterry
+                }
+
+                artifacts_result = {
+                    "HR": 0,
+                    "Arrhythmia": 'Artifacts',
+                    "beats": 0,
+                    "RRInterval": 0,
+                    "PRInterval": 0,
+                    "QTInterval": 0,
+                    "QRSComplex": 0,
+                    "STseg": 0,
+                    "PRseg": 0,
+                    "Vbeats": 0,
+                    "noOfPause": 0,
+                    "noOfPauseList": [],
+                    "ISOLATEDCOUNT": 0,
+                    "COUPLETCOUNT": 0,
+                    "TRIPLETCOUNT": 0,
+                    "PACTRIPLETCOUNT": 0,
+                    "PACCOUPLETCOUNT": 0,
+                    "ISOPAC": 0,
+                    "PACTOTALCOUNT": 0,
+                    "HRV": [],
+                    "RR": 0,
                 }
                 
                 if timetaken<2:
                     print("Data less than 2 second, half beat solution")
                 elif (loss_data > 800).any():
                     print(loss_data)
-                    result_data["Arrhythmia"] = "Artifacts"
-                    result_data["HR"] = 0
+                    result_data.update(artifacts_result)
                     publish_list = [result_data]
                     print("LOG:",publish_list)
                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                 elif final_output == "high_noise":
                     print("GPT Output")
-                    result_data["Arrhythmia"] = "Artifacts"
-                    result_data["HR"] = 0
+                    result_data.update(artifacts_result)
                     publish_list = [result_data]
                     print("LOG:",publish_list)
                     client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -4600,6 +4553,7 @@ def subscribe(client: mqtt_client):
                     fa=200
                     naa = np.array(OriginalSignal)
                     BloodPressure_check = BloodPressure(naa)
+
                     # for all lead detection (2, 7, 12)
                     rpeaks = check_r_index(all_lead_data, fs, int(version))
                     s_index, q_index = check_qs_index(all_lead_data, rpeaks, fs, int(version))
@@ -4682,7 +4636,7 @@ def subscribe(client: mqtt_client):
                             RRon = int(RRO[5])*5
                             PRseg =  abs(PPIn - RRon)
                     except:
-                            PRseg = "0"
+                        PRseg = "0"
                             
                     try:
                         beatss = int(int(HR)/4)
@@ -4692,6 +4646,7 @@ def subscribe(client: mqtt_client):
                     
                     finddata=[]
                     result_data['HR'] = HR
+                    result_data["HRV"]:hrv
                     result_data["beats"]=len(rpeaks)
                     result_data["RRInterval"]=str(SAf[0]) if SAf else str(0)
                     result_data["PRInterval"]=str(PRpeaks) if PRpeaks else str(0)
@@ -4714,7 +4669,7 @@ def subscribe(client: mqtt_client):
                                 HRss = int(60*int(len(rpeakss))/(timetakens))
                                 HRs = int(60*int(len(rpeakss))/(timetaken))
                                 if HRs>=60 and HRss>=60:
-                                    result_data.update({"Arrhythmia":'Artifacts',"HR":0})
+                                    result_data.update(artifacts_result)
                                     d2 = result_data
                                     finddata.append(d2)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
@@ -4741,13 +4696,13 @@ def subscribe(client: mqtt_client):
 
                             else:
                                 if int(HR)<60 and noise_cc != "Normal":
-                                    result_data.update({"Arrhythmia":'Artifacts',"HR":0})
+                                    result_data.update(artifacts_result)
                                     d2 = result_data
                                     finddata.append(d2)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                                 elif int(HR)>100 and noise_cc != "Normal":
-                                    result_data.update({"Arrhythmia":'Artifacts', "HR": 0})
+                                    result_data.update(artifacts_result)
                                     d2 = result_data
                                     finddata.append(d2)
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
@@ -4759,26 +4714,7 @@ def subscribe(client: mqtt_client):
                                     newdata = [i for n, i in enumerate(finddata) if i not in finddata[n + 1:]]
                                     client.publish(topic_y,json.dumps(newdata),qos=2)
                         except Exception as e:
-                            result_data["HR"]= 0
-                            result_data["Arrhythmia"]='Artifacts'
-                            result_data["beats"]=0
-                            result_data["RRInterval"]=0
-                            result_data["PRInterval"]=0
-                            result_data["QTInterval"]=0
-                            result_data["QRSComplex"]=0
-                            result_data["STseg"]=0
-                            result_data["PRseg"]=0
-                            result_data["Vbeats"]=0
-                            result_data["noOfPause"]=0
-                            result_data["ISOLATEDCOUNT"]=0
-                            result_data["COUPLETCOUNT"]=0
-                            result_data["TRIPLETCOUNT"]=0
-                            result_data["PACTRIPLETCOUNT"]=0
-                            result_data["PACCOUPLETCOUNT"]=0
-                            result_data["ISOPAC"]=0
-                            result_data["PACTOTALCOUNT"]=0
-                            result_data["HRV"]=[]
-                            result_data["RR"]= 0
+                            result_data.update(artifacts_result)
                             publish_list = [result_data]
                             print("LOG5:",publish_list,e)
                             client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -4786,32 +4722,11 @@ def subscribe(client: mqtt_client):
                         print("IN")
                         final_label = Vfib_asys_detection(all_lead_data, is_lead=int(version))
                         BloodPressure_check = BloodPressure(naa)
-                        result_data["HR"] = HR
-                        result_data["beats"]=0
-                        result_data["RRInterval"]=0
-                        result_data["PRInterval"]=0
-                        result_data["QTInterval"]=0
-                        result_data["QRSComplex"]=0
-                        result_data["STseg"]=0
-                        result_data["PRseg"]=0
-                        result_data["Vbeats"]=0
-                        result_data["noOfPause"]=0
-                        result_data["ISOLATEDCOUNT"]=0
-                        result_data["COUPLETCOUNT"]=0
-                        result_data["TRIPLETCOUNT"]=0
-                        result_data["PACTRIPLETCOUNT"]=0
-                        result_data["PACCOUPLETCOUNT"]=0
-                        result_data["ISOPAC"]=0
-                        result_data["PACTOTALCOUNT"]=0
 
                         if "VFIB/Vflutter" in final_label and int(timetaken)>=5: # final_label == "VFIB/Vflutter"
                             try:
                                 if abs(timetaken)<5:
-                                    result_data["HR"]= 0
-                                    result_data["Arrhythmia"]= 'Artifacts'
-                                    result_data["HRV"] = []
-                                    result_data["RR"] = 0
-                                    result_data["nibp"]={}
+                                    result_data.update(artifacts_result)
                                     publish_list = [result_data]
                                     print("LOG:",publish_list)
                                     client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -4828,19 +4743,13 @@ def subscribe(client: mqtt_client):
                                         x = mycol.insert_one(dict(i))
                                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                             except Exception as e:
-                                result_data["HR"]= 0
-                                result_data["Arrhythmia"]= 'Artifacts'
-                                result_data["HRV"] = []
-                                result_data["RR"] = 0
-                                result_data["nibp"]={}
+                                result_data.update(artifacts_result)
                                 publish_list = [result_data]                                                  
                                 print("LOG6:",publish_list,e)
                                 client.publish(topic_y,json.dumps(publish_list),qos=2)
                         elif "ASYS" in final_label  and int(timetaken)>=5:
+                            result_data.update(artifacts_result)
                             result_data["Arrhythmia"] = 'ASYSTOLE'
-                            result_data["HR"]= 0
-                            result_data["HRV"]:[]
-                            result_data["RR"]:0
                             publish_list = [result_data]
                             print("LOG:",publish_list)
                             for i in publish_list:
@@ -4848,23 +4757,6 @@ def subscribe(client: mqtt_client):
                             client.publish(topic_y,json.dumps(publish_list),qos=2)
                         elif "Noise" in final_label:
                             print("VFIB Model Noise")
-
-                            result_data["beats"]=0
-                            result_data["RRInterval"]=0
-                            result_data["PRInterval"]=0
-                            result_data["QTInterval"]=0
-                            result_data["QRSComplex"]=0
-                            result_data["STseg"]=0
-                            result_data["PRseg"]=0
-                            result_data["Vbeats"]=0
-                            result_data["noOfPause"]=0
-                            result_data["ISOLATEDCOUNT"]=0
-                            result_data["COUPLETCOUNT"]=0
-                            result_data["TRIPLETCOUNT"]=0
-                            result_data["PACTRIPLETCOUNT"]=0
-                            result_data["PACCOUPLETCOUNT"]=0
-                            result_data["ISOPAC"]=0
-                            result_data["PACTOTALCOUNT"]=0
                             try:                               
                                 if HR>60 and HR<100:
                                     result_data["HR"] = int(HR)
@@ -4875,19 +4767,12 @@ def subscribe(client: mqtt_client):
                                     print("LOG:",publish_list)
                                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                                 else:
-                                    result_data["HR"] = 0
-                                    result_data["Arrhythmia"] = "Artifacts"
-                                    result_data["HRV"]= []
-                                    result_data["RR"]=0
-                                    result_data["nibp"]={}
+                                    result_data.update(artifacts_result)
                                     publish_list = [result_data] 
                                     print("LOG:",publish_list)
                                     client.publish(topic_y,json.dumps(publish_list),qos=2)
                             except Exception as e:
-                                result_data["HR"]=0
-                                result_data["Arrhythmia"]='Artifacts' 
-                                result_data["HRV"]=[]
-                                result_data["RR"]=0
+                                result_data.update(artifacts_result)
                                 publish_list = [result_data]
                                 print("LOG7:",publish_list,e)
                                 client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -5065,11 +4950,10 @@ def subscribe(client: mqtt_client):
                                         pvc_counts = pvc_detection_result['pvc_counts']
                                     if 'lbbb_rbbb_label' in pvc_detection_result:
                                         lbbb_rbbb_label = pvc_detection_result['lbbb_rbbb_label']
+                                    
                                     if pvc_label:
-                                        
                                         if 'PVC-Isolated' in pvc_label: #actaulPVC.count(1)>0:
                                             result_data.update({"Arrhythmia":'PVC-Isolated',"Vbeats":observer.count(1),"HR":int(HR),"ISOLATEDCOUNT":observer.count(1),"peakslocation":peaksdefined})
-                                            
                                         if 'PVC-Quadrigeminy'in pvc_label: #Quadgem_count>=1:
                                             result_data.update({"Arrhythmia":'PVC-Quadrigeminy',"Vbeats":observer.count(1),"HR":int(HR),"peakslocation":peaksdefined})
                                         if "PVC-Trigeminy" in pvc_label: #Trigem_count>=1:
@@ -5196,19 +5080,19 @@ def subscribe(client: mqtt_client):
                                         block_results = block_detection_processing(all_lead_data, is_lead=int(version), fs=fs)
                                         final_label = block_results['block_label']
                                         ei_ti_block = block_results['ei_ti_label']
-                                        if final_label == "III Degree": 
+                                        if "III Degree" in final_label: 
                                             result_data.update({"Arrhythmia":'III Degree', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                 result_data["threeLatter"].append(ei_ti_blockdata)
                                             d3 = result_data
                                             finddata.append(d3)
-                                        elif final_label == "MOBITZ-I":
+                                        elif "MOBITZ-I" in final_label:
                                             result_data.update({"Arrhythmia":'MOBITZ-I', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                 result_data["threeLatter"].append(ei_ti_blockdata)
                                             d3 = result_data
                                             finddata.append(d3)
-                                        elif final_label == "MOBITZ-II":
+                                        elif "MOBITZ-II" in final_label:
                                             result_data.update({"Arrhythmia":'MOBITZ-II', "HR": int(HR)})
                                             for ei_ti_blockdata in ei_ti_block:
                                                     result_data["threeLatter"].append(ei_ti_blockdata)
@@ -5328,26 +5212,7 @@ def subscribe(client: mqtt_client):
                                 if allarr == 'All-Arrhythmia':
                                     if int(result_data['HR'])<=20 or result_data['Arrhythmia']=='':
                                         print("HR<20 issue", result_data['HR'])
-                                        result_data["HR"]= 0
-                                        result_data["Arrhythmia"]='Artifacts'
-                                        result_data["beats"]=0
-                                        result_data["RRInterval"]=0
-                                        result_data["PRInterval"]=0
-                                        result_data["QTInterval"]=0
-                                        result_data["QRSComplex"]=0
-                                        result_data["STseg"]=0
-                                        result_data["PRseg"]=0
-                                        result_data["Vbeats"]=0
-                                        result_data["noOfPause"]=0
-                                        result_data["ISOLATEDCOUNT"]=0
-                                        result_data["COUPLETCOUNT"]=0
-                                        result_data["TRIPLETCOUNT"]=0
-                                        result_data["PACTRIPLETCOUNT"]=0
-                                        result_data["PACCOUPLETCOUNT"]=0
-                                        result_data["ISOPAC"]=0
-                                        result_data["PACTOTALCOUNT"]=0
-                                        result_data["HRV"]=[]
-                                        result_data["RR"]= 0
+                                        result_data.update(artifacts_result)
                                         publish_list = [result_data]
                                         print("LOG:",publish_list)
                                         client.publish(topic_y,json.dumps(publish_list),qos=2)
@@ -5364,26 +5229,7 @@ def subscribe(client: mqtt_client):
                             except Exception as e:
                                 print("Data Corrupted",e)
                                 traceback.print_exc()
-                                result_data["HR"]= 0
-                                result_data["Arrhythmia"]='Artifacts'
-                                result_data["beats"]=0
-                                result_data["RRInterval"]=0
-                                result_data["PRInterval"]=0
-                                result_data["QTInterval"]=0
-                                result_data["QRSComplex"]=0
-                                result_data["STseg"]=0
-                                result_data["PRseg"]=0
-                                result_data["Vbeats"]=0
-                                result_data["noOfPause"]=0
-                                result_data["ISOLATEDCOUNT"]=0
-                                result_data["COUPLETCOUNT"]=0
-                                result_data["TRIPLETCOUNT"]=0
-                                result_data["PACTRIPLETCOUNT"]=0
-                                result_data["PACCOUPLETCOUNT"]=0
-                                result_data["ISOPAC"]=0
-                                result_data["PACTOTALCOUNT"]=0
-                                result_data["HRV"]=[]
-                                result_data["RR"]= 0  
+                                result_data.update(artifacts_result) 
                                 publish_list = [result_data]                                                 
                                 print("LOG:",publish_list)
                                 client.publish(topic_y,json.dumps(publish_list),qos=2)
